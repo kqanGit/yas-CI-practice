@@ -28,7 +28,6 @@ pipeline {
             steps {
                 echo "--- Verifying Environment Capabilities ---"
                 sh 'java -version'
-                sh 'docker --version'
                 // Check for Maven Wrapper; if not found, verify if Maven is installed
                 sh '[ -f mvnw ] && echo "Maven Wrapper found" || mvn -version'
             }
