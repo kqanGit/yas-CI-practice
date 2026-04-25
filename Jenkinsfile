@@ -29,7 +29,7 @@ pipeline {
                 echo "--- Verifying Environment Capabilities ---"
                 sh 'java -version'
                 // Check for Maven Wrapper; if not found, verify if Maven is installed
-                sh '[ -f mvnw ] && echo "Maven Wrapper found" || mvn -version'
+            
             }
         }
 
