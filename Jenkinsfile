@@ -22,6 +22,36 @@ pipeline {
         }
 
         // ───────────────────────────────────────────────────────
+        // STAGE 5: GITLEAKS SCAN
+        // Scan repository for accidentally committed secrets
+        // Requires gitleaks installed on Jenkins VM
+        // ───────────────────────────────────────────────────────
+        // stage('Gitleaks Scan') {
+        //     steps {
+        //         echo ">>> Scanning for secrets with Gitleaks..."
+        //         sh 'gitleaks detect --source . --report-path gitleaks-report.json --report-format json --no-git || true'
+        //         archiveArtifacts artifacts: 'gitleaks-report.json', allowEmptyArchive: true
+        //     }
+        // }
+
+        stage('Gitleaks Scan') {
+            steps {
+                echo ">>> Scanning for secrets with Gitleaks..."
+                sh '''
+                    gitleaks detect \
+                    --source . \
+                    --report-path gitleaks-report.json \
+                    --report-format json
+                '''
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'gitleaks-report.json', allowEmptyArchive: true
+                }
+            }
+        }
+
+        // ───────────────────────────────────────────────────────
         // STAGE 2: Detect which services have changed
         // This handles the MONOREPO requirement — only build/test
         // the services that actually have code changes.
@@ -134,19 +164,6 @@ pipeline {
                         }
                     }
                 }
-            }
-        }
-
-        // ───────────────────────────────────────────────────────
-        // STAGE 5: GITLEAKS SCAN
-        // Scan repository for accidentally committed secrets
-        // Requires gitleaks installed on Jenkins VM
-        // ───────────────────────────────────────────────────────
-        stage('Gitleaks Scan') {
-            steps {
-                echo ">>> Scanning for secrets with Gitleaks..."
-                sh 'gitleaks detect --source . --report-path gitleaks-report.json --report-format json --no-git || true'
-                archiveArtifacts artifacts: 'gitleaks-report.json', allowEmptyArchive: true
             }
         }
     }
