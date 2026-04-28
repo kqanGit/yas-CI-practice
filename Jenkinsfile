@@ -166,6 +166,26 @@ pipeline {
                 }
             }
         }
+
+        // ───────────────────────────────────────────────────────
+        // STAGE 6: SONARQUBE ANALYSIS
+        // Run static code analysis and send results to SonarQube
+        // ───────────────────────────────────────────────────────
+        stage('SonarQube Analysis') {
+            when {
+                expression { return env.SKIP_BUILD != 'true' }
+            }
+            steps {
+                withSonarQubeEnv('sonarqube') {   // tên phải giống trong System
+                    sh """
+                    mvn sonar:sonar \
+                    -pl ${env.SERVICES_TO_BUILD} \
+                    -am \
+                    -Dsonar.projectKey=yas-project
+                    """
+                }
+            }
+        }
     }
 
     post {
