@@ -207,6 +207,18 @@ pipeline {
                 }
             }
         }
+
+        // ───────────────────────────────────────────────────────
+        // STAGE 7: QUALIRT GATE - SONARQUBE
+        // Wait sonarqube return result about test coverage
+        // ───────────────────────────────────────────────────────
+        stage("Quality Gate") {
+            steps {
+                timeout(time: 2, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }
     }
 
     post {
