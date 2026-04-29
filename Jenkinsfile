@@ -5,7 +5,7 @@ pipeline {
         // If Java is not in default PATH, uncomment and adjust:
         // JAVA_HOME = '/usr/lib/jvm/java-21-openjdk-amd64'
 
-        JAVA_HOME = '/root/.sdkman/candidates/java/25.0.2-tem'
+        JAVA_HOME = '/root/.sdkman/candidates/java/25.0.2-tem' 
         PATH = "${JAVA_HOME}/bin:${env.PATH}"
 
         // All Java services in the monorepo
@@ -189,17 +189,15 @@ pipeline {
         // Run static code analysis and send results to SonarQube
         // ───────────────────────────────────────────────────────
         stage('SonarQube Analysis') {
-            // when {
-            //     expression { return env.SKIP_BUILD != 'true' }
-            // } // comment to test sonarqube
             steps {
-                withSonarQubeEnv('sonarqube') {   // tên phải giống trong System
-                    sh """
+                withSonarQubeEnv('sonarqube') {
+                    sh '''
+                    java -version
+                    mvn -v
+
                     mvn sonar:sonar \
-                    -pl ${env.SERVICES_TO_BUILD} \
-                    -am \
                     -Dsonar.projectKey=yas-project
-                    """
+                    '''
                 }
             }
         }
