@@ -5,7 +5,7 @@ pipeline {
         // If Java is not in default PATH, uncomment and adjust:
         // JAVA_HOME = '/usr/lib/jvm/java-21-openjdk-amd64'
 
-        JAVA_HOME = '/root/.sdkman/candidates/java/25.0.2-tem' 
+        JAVA_HOME = '/var/jenkins_home/.sdkman/candidates/java/25.0.2-tem'
         PATH = "${JAVA_HOME}/bin:${env.PATH}"
 
         // All Java services in the monorepo
@@ -190,6 +190,11 @@ pipeline {
         // ───────────────────────────────────────────────────────
         stage('SonarQube Analysis') {
             steps {
+                sh 'echo USER=$(whoami)'
+                sh 'echo JAVA_HOME=$JAVA_HOME'
+                sh 'which java'
+                sh 'java -version'
+                sh 'mvn -v'
                 withSonarQubeEnv('sonarqube') {
                     sh '''
                     java -version
