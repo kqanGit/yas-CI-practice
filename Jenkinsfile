@@ -189,9 +189,9 @@ pipeline {
         // Run static code analysis and send results to SonarQube
         // ───────────────────────────────────────────────────────
         stage('SonarQube Analysis') {
-            when {
-                expression { return env.SKIP_BUILD != 'true' }
-            }
+            // when {
+            //     expression { return env.SKIP_BUILD != 'true' }
+            // } // comment to test sonarqube
             steps {
                 withSonarQubeEnv('sonarqube') {   // tên phải giống trong System
                     sh """
