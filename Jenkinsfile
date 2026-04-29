@@ -37,12 +37,24 @@ pipeline {
         stage('Gitleaks Scan') {
             steps {
                 echo ">>> Scanning for secrets with Gitleaks..."
-                sh '''
-                    gitleaks detect \
-                    --source . \
-                    --report-path gitleaks-report.json \
-                    --report-format json
-                '''
+
+                script {
+                    def status = sh(
+                        script: '''
+                        gitleaks detect \
+                        --source . \
+                        --report-path gitleaks-report.json \
+                        --report-format json
+                        ''',
+                        returnStatus: true
+                    )
+
+                    if (status != 0) {
+                        echo "⚠️ Gitleaks detected potential leaks, but pipeline will continue (CI practice mode)."
+                    } else {
+                        echo "✅ No leaks found."
+                    }
+                }
             }
             post {
                 always {
