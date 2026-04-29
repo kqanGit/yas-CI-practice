@@ -190,17 +190,17 @@ pipeline {
         // ───────────────────────────────────────────────────────
         stage('SonarQube Analysis') {
             steps {
-                sh 'echo USER=$(whoami)'
-                sh 'echo JAVA_HOME=$JAVA_HOME'
-                sh 'which java'
-                sh 'java -version'
-                sh 'mvn -v'
+                sh '''
+                echo USER=$(whoami)
+                echo JAVA_HOME=$JAVA_HOME
+                which java
+                java -version
+                mvn -v
+                '''
+
                 withSonarQubeEnv('sonarqube') {
                     sh '''
-                    java -version
-                    mvn -v
-
-                    mvn sonar:sonar \
+                    mvn clean verify sonar:sonar \
                     -Dsonar.projectKey=yas-project
                     '''
                 }
