@@ -46,6 +46,7 @@ pipeline {
                         script: '''
                         gitleaks detect \
                         --source . \
+                        --config gitleaks.toml \
                         --report-path gitleaks-report.json \
                         --report-format json
                         ''',
