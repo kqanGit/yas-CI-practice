@@ -5,6 +5,9 @@ pipeline {
         // If Java is not in default PATH, uncomment and adjust:
         // JAVA_HOME = '/usr/lib/jvm/java-21-openjdk-amd64'
 
+        JAVA_HOME = '/root/.sdkman/candidates/java/25.0.2-tem'
+        PATH = "${JAVA_HOME}/bin:${env.PATH}"
+
         // All Java services in the monorepo
         JAVA_SERVICES = 'cart,customer,delivery,inventory,location,media,order,payment,payment-paypal,product,promotion,rating,recommendation,sampledata,search,storefront-bff,backoffice-bff,tax,webhook'
     }
@@ -135,6 +138,8 @@ pipeline {
             }
             steps {
                 echo ">>> Building: ${env.SERVICES_TO_BUILD}"
+                sh 'java -version'
+                sh 'mvn -v'
                 sh "mvn clean install -pl ${env.SERVICES_TO_BUILD} -am -DskipTests"
             }
         }
