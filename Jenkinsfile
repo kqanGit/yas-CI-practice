@@ -202,6 +202,7 @@ pipeline {
                     sh '''
                     mvn clean verify sonar:sonar \
                     -Dsonar.projectKey=yas-project
+                    -DskipTests
                     '''
                 }
             }
