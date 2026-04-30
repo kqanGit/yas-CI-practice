@@ -195,6 +195,24 @@ pipeline {
         }
 
         // ───────────────────────────────────────────────────────
+        // STAGE 8: SNYK SCAN
+        // Scan dependencies to secure system if dependencies is not safe
+        // ───────────────────────────────────────────────────────
+        stage('Snyk Scan') {
+            steps {
+                withCredentials([string(credentialsId: 'snyk_connection', variable: 'SNYK_TOKEN')]) {
+                    sh '''
+                    snyk auth $SNYK_TOKEN
+
+                    echo ">>> Running Snyk vulnerability scan..."
+
+                    snyk test || true
+                    '''
+                }
+            }
+        }
+
+        // ───────────────────────────────────────────────────────
         // STAGE 6: SONARQUBE ANALYSIS
         // Run static code analysis and send results to SonarQube
         // ───────────────────────────────────────────────────────
