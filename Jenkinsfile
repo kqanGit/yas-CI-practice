@@ -150,22 +150,22 @@ pipeline {
         // Run unit tests + integration tests, generate coverage
         // ───────────────────────────────────────────────────────
         stage('Test') {
-            // when {
-            //     expression { return env.SKIP_BUILD != 'true' }
-            // }
-            // steps {
-            //     echo ">>> Testing: ${env.SERVICES_TO_BUILD}"
-            //     sh "mvn verify -pl ${env.SERVICES_TO_BUILD} -am -Dmaven.install.skip=true"
-            // } comment to run test to show coverage
-            steps {
-                script {
-                    if (env.SERVICES_TO_BUILD?.trim()) {
-                        sh "mvn verify -pl ${env.SERVICES_TO_BUILD} -am -Dmaven.install.skip=true"
-                    } else {
-                        sh "mvn verify -Dmaven.install.skip=true"
-                    }
-                }
+            when {
+                expression { return env.SKIP_BUILD != 'true' }
             }
+            steps {
+                echo ">>> Testing: ${env.SERVICES_TO_BUILD}"
+                sh "mvn verify -pl ${env.SERVICES_TO_BUILD} -am -Dmaven.install.skip=true"
+            } // comment to run test to show coverage
+            // steps {
+            //     script {
+            //         if (env.SERVICES_TO_BUILD?.trim()) {
+            //             sh "mvn verify -pl ${env.SERVICES_TO_BUILD} -am -Dmaven.install.skip=true"
+            //         } else {
+            //             sh "mvn verify -Dmaven.install.skip=true"
+            //         }
+            //     }
+            // }
             post {
                 always {
                     // Publish JUnit test results to Jenkins dashboard
