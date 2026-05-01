@@ -116,9 +116,9 @@ pipeline {
                     }
 
                     if (servicesToBuild.isEmpty()) {
-                        env.SERVICES_TO_BUILD = ''
-                        env.SKIP_BUILD = 'true'
-                        echo ">>> No Java services changed. Pipeline will skip build/test."
+                        env.SERVICES_TO_BUILD = allServices.toList().join(',')
+                        env.SKIP_BUILD = 'false'
+                        echo ">>> No specific service detected. Building ALL services."
                     } else {
                         // Maven uses comma-separated module list: -pl cart,media,order
                         env.SERVICES_TO_BUILD = servicesToBuild.join(',')
