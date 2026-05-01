@@ -216,7 +216,7 @@ pipeline {
         // STAGE 6: SONARQUBE ANALYSIS
         // Run static code analysis and send results to SonarQube
         // ───────────────────────────────────────────────────────
-        stage('SonarQube Analysis') {
+       stage('SonarQube Analysis') {
             steps {
                 sh '''
                 echo USER=$(whoami)
@@ -228,9 +228,8 @@ pipeline {
 
                 withSonarQubeEnv('sonarqube') {
                     sh '''
-                    mvn clean verify sonar:sonar \
-                    -Dsonar.projectKey=yas-project \
-                    -DskipTests
+                    mvn sonar:sonar \
+                    -Dsonar.projectKey=yas-project
                     '''
                 }
             }
