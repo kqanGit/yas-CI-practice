@@ -216,20 +216,16 @@ pipeline {
         // STAGE 6: SONARQUBE ANALYSIS
         // Run static code analysis and send results to SonarQube
         // ───────────────────────────────────────────────────────
-       stage('SonarQube Analysis') {
+         stage('SonarQube Analysis') {
             steps {
-                sh '''
-                echo USER=$(whoami)
-                echo JAVA_HOME=$JAVA_HOME
-                which java
-                java -version
-                mvn -v
-                '''
+                // Generate JaCoCo XML reports from .exec files (needed for SonarQube)
+                sh "mvn jacoco:report -pl ${env.SERVICES_TO_BUILD} -am"
 
                 withSonarQubeEnv('sonarqube') {
                     sh '''
                     mvn sonar:sonar \
-                    -Dsonar.projectKey=yas-project
+                    -Dsonar.projectKey=yas-project \
+                    -Dsonar.coverage.jacoco.xmlReportPaths=**/target/site/jacoco/jacoco.xml
                     '''
                 }
             }
