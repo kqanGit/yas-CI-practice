@@ -6,8 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -19,7 +19,6 @@ import com.yas.commonlibrary.exception.NotFoundException;
 import com.yas.product.model.Category;
 import com.yas.product.model.Brand;
 import com.yas.product.model.ProductCategory;
-import com.yas.product.model.ProductCategory;
 import com.yas.product.model.Product;
 import com.yas.product.model.ProductOption;
 import com.yas.product.model.ProductOptionCombination;
@@ -27,7 +26,6 @@ import com.yas.product.model.ProductRelated;
 import com.yas.product.model.enumeration.DimensionUnit;
 import com.yas.product.model.enumeration.FilterExistInWhSelection;
 import com.yas.product.model.attribute.ProductAttribute;
-import com.yas.product.model.attribute.ProductAttributeGroup;
 import com.yas.product.model.attribute.ProductAttributeValue;
 import com.yas.product.repository.BrandRepository;
 import com.yas.product.repository.CategoryRepository;
@@ -38,7 +36,6 @@ import com.yas.product.repository.ProductOptionRepository;
 import com.yas.product.repository.ProductOptionValueRepository;
 import com.yas.product.repository.ProductRelatedRepository;
 import com.yas.product.repository.ProductRepository;
-import com.yas.product.utils.Constants;
 import com.yas.product.viewmodel.NoFileMediaVm;
 import com.yas.product.viewmodel.product.ProductDetailVm;
 import com.yas.product.viewmodel.product.ProductListVm;
@@ -50,8 +47,6 @@ import com.yas.product.viewmodel.product.ProductVariationPostVm;
 import com.yas.product.viewmodel.product.ProductVariationPutVm;
 import com.yas.product.viewmodel.productoption.ProductOptionValuePostVm;
 import com.yas.product.viewmodel.productoption.ProductOptionValuePutVm;
-import java.math.BigDecimal;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -61,7 +56,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -109,7 +103,9 @@ class ProductServiceTest {
 
     @BeforeEach
     void setUp() {
-        Mockito.reset(productRepository, brandRepository, categoryRepository);
+        clearInvocations(productRepository);
+        clearInvocations(brandRepository);
+        clearInvocations(categoryRepository);
 
         validProductPostVm = createValidProductPostVm();
         validProductPutVm = createValidProductPutVm();
@@ -1081,12 +1077,166 @@ class ProductServiceTest {
         return Collections.emptyList();
     }
 
-    private static List<ProductOptionValuePutVm> emptyProductOptionValuePutVmList() {
-        return Collections.emptyList();
-    }
-
     private static List<com.yas.product.viewmodel.product.ProductOptionValueDisplay> emptyProductOptionValueDisplayList() {
         return Collections.emptyList();
     }
+
+    @Nested
+    class AdditionalCoverageTests {
+
+    @Test
+    void testGetProductsByBrand_whenBrandExists_thenReturnThumbnails() {
+        Brand brand = new Brand();
+        brand.setId(11L);
+        brand.setSlug("brand-slug");
+
+        Product product = new Product();
+        product.setId(101L);
+        product.setName("P1");
+        product.setSlug("p1");
+        product.setThumbnailMediaId(1L);
+
+        when(brandRepository.findBySlug("brand-slug")).thenReturn(Optional.of(brand));
+        when(productRepository.findAllByBrandAndIsPublishedTrueOrderByIdAsc(brand)).thenReturn(List.of(product));
+        when(mediaService.getMedia(1L)).thenReturn(new NoFileMediaVm(1L, "c", "f", "image/png", "http://img/1"));
+
+        var result = productService.getProductsByBrand("brand-slug");
+
+        assertEquals(1, result.size());
+        assertEquals("http://img/1", result.get(0).thumbnailUrl());
+    }
+
+    @Test
+    void testGetProductsByBrand_whenBrandMissing_thenThrowNotFoundException() {
+        when(brandRepository.findBySlug("x")).thenReturn(Optional.empty());
+        assertThrows(NotFoundException.class, () -> productService.getProductsByBrand("x"));
+    }
+
+    @Test
+    void testGetProductSlug_parentAndNoParent() {
+        Product child = new Product();
+        child.setId(201L);
+        child.setSlug("child-slug");
+        Product parent = new Product();
+        parent.setId(200L);
+        parent.setSlug("parent-slug");
+        child.setParent(parent);
+
+        when(productRepository.findById(201L)).thenReturn(Optional.of(child));
+        var vm = productService.getProductSlug(201L);
+        assertEquals("parent-slug", vm.slug());
+        assertEquals(201L, vm.productVariantId());
+
+        Product solo = new Product();
+        solo.setId(202L);
+        solo.setSlug("solo-slug");
+        when(productRepository.findById(202L)).thenReturn(Optional.of(solo));
+        var vm2 = productService.getProductSlug(202L);
+        assertEquals("solo-slug", vm2.slug());
+    }
+
+    @Test
+    void testGetProductEsDetail_whenBrandMissingAndThumbnailNull_thenNulls() {
+        Product p = new Product();
+        p.setId(301L);
+        p.setName("n");
+        p.setSlug("s");
+        p.setPrice(9.9);
+        p.setPublished(true);
+        p.setVisibleIndividually(true);
+        p.setAllowedToOrder(true);
+        p.setFeatured(false);
+        p.setThumbnailMediaId(null);
+        p.setProductCategories(Collections.emptyList());
+        p.setAttributeValues(Collections.emptyList());
+
+        when(productRepository.findById(301L)).thenReturn(Optional.of(p));
+
+        var vm = productService.getProductEsDetailById(301L);
+        assertEquals(p.getId(), vm.id());
+        assertEquals(null, vm.thumbnailMediaId());
+        assertEquals(null, vm.brand());
+    }
+
+    @Test
+    void testGetProductVariationsByParentId_hasOptionsTrue_mapsOptions() {
+        Product parent = new Product();
+        parent.setId(401L);
+        parent.setHasOptions(true);
+
+        Product child = new Product();
+        child.setId(402L);
+        child.setName("c");
+        child.setSlug("c-slug");
+        child.setSku("sku");
+        child.setGtin("gtin");
+        child.setPrice(1.0);
+        child.setThumbnailMediaId(5L);
+        child.setProductImages(Collections.emptyList());
+        child.setParent(parent);
+        child.setPublished(true);
+
+        parent.setProducts(List.of(child));
+
+        ProductOption po = new ProductOption();
+        po.setId(77L);
+
+        ProductOptionCombination poc = new ProductOptionCombination();
+        poc.setProductOption(po);
+        poc.setValue("red");
+
+        when(productRepository.findById(401L)).thenReturn(Optional.of(parent));
+        when(productOptionCombinationRepository.findAllByProduct(child)).thenReturn(List.of(poc));
+        when(mediaService.getMedia(5L)).thenReturn(new NoFileMediaVm(5L, "c", "f", "image/png", "u"));
+
+        var variations = productService.getProductVariationsByParentId(401L);
+        assertEquals(1, variations.size());
+        assertEquals("red", variations.get(0).options().get(77L));
+    }
+
+    @Test
+    void testGetProductsByMultiQuery_trimsInputs() {
+        Product p = new Product();
+        p.setId(501L);
+        p.setName("nm");
+        p.setSlug("s");
+        p.setThumbnailMediaId(9L);
+        p.setPrice(2.0);
+
+        Page<Product> page = new PageImpl<>(List.of(p));
+        when(productRepository.findByProductNameAndCategorySlugAndPriceBetween("a", "b", 0.0, 10.0, PageRequest.of(0,10)))
+            .thenReturn(page);
+        when(mediaService.getMedia(9L)).thenReturn(new NoFileMediaVm(9L,"c","f","image/png","u"));
+
+        var result = productService.getProductsByMultiQuery(0,10," a "," b ",0.0,10.0);
+        assertEquals(1, result.productContent().size());
+    }
+
+    @Test
+    void testSubtractAndRestoreStockQuantity_partitionAndCalculation() {
+        Product p1 = new Product();
+        p1.setId(601L);
+        p1.setStockTrackingEnabled(true);
+        p1.setStockQuantity(5L);
+
+        when(productRepository.findAllByIdIn(List.of(601L))).thenReturn(List.of(p1));
+
+        ProductQuantityPutVm putVm = new ProductQuantityPutVm(601L, 10L);
+        productService.subtractStockQuantity(List.of(putVm));
+
+        assertEquals(0L, p1.getStockQuantity());
+        verify(productRepository, times(1)).saveAll(anyList());
+
+        // restore
+        clearInvocations(productRepository);
+        p1.setStockQuantity(0L);
+        when(productRepository.findAllByIdIn(List.of(601L))).thenReturn(List.of(p1));
+        ProductQuantityPutVm restoreVm = new ProductQuantityPutVm(601L, 3L);
+        productService.restoreStockQuantity(List.of(restoreVm));
+        assertEquals(3L, p1.getStockQuantity());
+        verify(productRepository, times(1)).saveAll(anyList());
+    }
+
+}
 
 }
