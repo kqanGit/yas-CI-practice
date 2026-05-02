@@ -343,4 +343,122 @@ class CustomerServiceTest {
     assertThat(result.getValue()).isEqualTo("testpassword");
     assertThat(result.isTemporary()).isFalse();
   }
+
+  // ===== Additional edge case tests =====
+
+  @Test
+  void getCustomers_shouldCalculateTotalPage_correctly() {
+    // Create 25 users (more than 10 per page)
+    List<UserRepresentation> users = new ArrayList<>();
+    for (int i = 1; i <= 25; i++) {
+      users.add(createUserRepresentation(String.valueOf(i), "user" + i, "user" + i + "@example.com",
+          "First" + i, "Last" + i, true));
+    }
+    when(usersResource.search(any(), anyInt(), anyInt())).thenReturn(users);
+
+    CustomerListVm result = customerService.getCustomers(1);
+
+    assertThat(result.totalUser()).isEqualTo(25);
+    assertThat(result.totalPage()).isEqualTo(3); // 25/10 = 2.5 rounded up = 3
+    assertThat(result.customers()).hasSize(25);
+  }
+
+  @Test
+  void getCustomers_shouldFilterOutDisabledUsers() {
+    List<UserRepresentation> users = List.of(
+        createUserRepresentation("1", "user1", "user1@example.com", "First1", "Last1", false), // disabled
+        createUserRepresentation("2", "user2", "user2@example.com", "First2", "Last2", true)   // enabled
+    );
+    when(usersResource.search(any(), anyInt(), anyInt())).thenReturn(users);
+
+    CustomerListVm result = customerService.getCustomers(1);
+
+    // Should only return enabled user
+    assertThat(result.customers()).hasSize(1);
+    assertThat(result.customers().getFirst().getUsername()).isEqualTo("user2");
+  }
+
+  @Test
+  void getCustomerByEmail_shouldReturnFirstUser_whenMultipleUsersFound() {
+    List<UserRepresentation> users = List.of(
+        createUserRepresentation("1", "user1", VALID_EMAIL, "First1", "Last1", true),
+        createUserRepresentation("2", "user2", VALID_EMAIL, "First2", "Last2", true)
+    );
+    when(usersResource.search(VALID_EMAIL, true)).thenReturn(users);
+
+    CustomerAdminVm result = customerService.getCustomerByEmail(VALID_EMAIL);
+
+    // Should return first user
+    assertThat(result.id()).isEqualTo("1");
+    assertThat(result.username()).isEqualTo("user1");
+  }
+
+  @Test
+  void updateCustomer_shouldUpdateEmail_whenUserExists() {
+    UserRepresentation user = createUserRepresentation(USER_NAME, USER_NAME, "old@example.com",
+        "First", "Last", true);
+    UserResource userResource = mock(UserResource.class);
+    when(usersResource.get(USER_NAME)).thenReturn(userResource);
+    when(userResource.toRepresentation()).thenReturn(user);
+
+    CustomerProfileRequestVm request = new CustomerProfileRequestVm("First", "Last", "new@example.com");
+    customerService.updateCustomer(USER_NAME, request);
+
+    verify(userResource).update(any(UserRepresentation.class));
+  }
+
+  @Test
+  void deleteCustomer_shouldDisableUser_notEnableUser() {
+    UserRepresentation user = createUserRepresentation(USER_NAME, USER_NAME, "test@example.com",
+        "First", "Last", true);
+    UserResource userResource = mock(UserResource.class);
+    when(usersResource.get(USER_NAME)).thenReturn(userResource);
+    when(userResource.toRepresentation()).thenReturn(user);
+
+    customerService.deleteCustomer(USER_NAME);
+
+    // Verify update was called - the user should be disabled
+    verify(userResource).update(any(UserRepresentation.class));
+  }
+
+  @Test
+  void getCustomers_shouldHandleException_whenServerError() {
+    when(usersResource.search(any(), anyInt(), anyInt()))
+        .thenThrow(new RuntimeException("Server error"));
+
+    assertThrows(RuntimeException.class, () -> customerService.getCustomers(1));
+  }
+
+  @Test
+  void getCustomerByEmail_shouldHandleException_whenServerError() {
+    when(usersResource.search(VALID_EMAIL, true))
+        .thenThrow(new RuntimeException("Server error"));
+
+    assertThrows(RuntimeException.class, () -> customerService.getCustomerByEmail(VALID_EMAIL));
+  }
+
+  @Test
+  void getCustomerProfile_shouldHandleException_whenServerError() {
+    when(usersResource.get(USER_NAME))
+        .thenThrow(new RuntimeException("Server error"));
+
+    assertThrows(RuntimeException.class, () -> customerService.getCustomerProfile(USER_NAME));
+  }
+
+  @Test
+  void updateCustomer_shouldHandleException_whenServerError() {
+    when(usersResource.get(USER_NAME))
+        .thenThrow(new RuntimeException("Server error"));
+
+    CustomerProfileRequestVm request = new CustomerProfileRequestVm("First", "Last", "test@example.com");
+    assertThrows(RuntimeException.class, () -> customerService.updateCustomer(USER_NAME, request));
+  }
+
+  @Test
+  void deleteCustomer_shouldHandleException_whenServerError() {
+    when(usersResource.get(USER_NAME))
+        .thenThrow(new RuntimeException("Server error"));
+
+    assertThrows(RuntimeException.class, () -> customerService.deleteCustomer(USER_NAME));
+  }
 }
