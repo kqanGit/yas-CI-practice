@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(mvn test *)",
-      "Bash(./mvnw test-compile *)"
+      "Bash(./mvnw test-compile *)",
+      "Bash(mvn compile *)"
     ]
   }
 }
