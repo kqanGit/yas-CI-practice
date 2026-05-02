@@ -375,7 +375,7 @@ class CustomerServiceTest {
 
     // Should only return enabled user
     assertThat(result.customers()).hasSize(1);
-    assertThat(result.customers().getFirst().getUsername()).isEqualTo("user2");
+    assertThat(result.customers().get(0).id()).isEqualTo("2");
   }
 
   @Test
