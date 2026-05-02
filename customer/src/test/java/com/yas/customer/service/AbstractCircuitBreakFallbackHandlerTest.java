@@ -1,11 +1,9 @@
 package com.yas.customer.service;
 
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.IOException;
-import java.util.Collections;
 import org.junit.jupiter.api.Test;
 
 class AbstractCircuitBreakFallbackHandlerTest {
@@ -14,36 +12,42 @@ class AbstractCircuitBreakFallbackHandlerTest {
   private TestCircuitBreakHandler handler = new TestCircuitBreakHandler();
 
   @Test
-  void handleBodilessFallback_shouldThrowOriginalException() {
+  void handleBodilessFallback_shouldThrowOriginalException() throws Throwable {
     IOException originalException = new IOException("Original error");
 
     assertThrows(IOException.class, () -> handler.testHandleBodilessFallback(originalException));
   }
 
   @Test
-  void handleTypedFallback_shouldThrowOriginalException_andReturnNull() {
+  void handleTypedFallback_shouldThrowOriginalException_andReturnNull() throws Throwable {
     IOException originalException = new IOException("Original error");
 
     // The method first throws, then returns null (but throw happens first)
-    assertThrows(IOException.class, () -> handler.testHandleTypedFallback(originalException));
+    assertThrows(IOException.class, () -> {
+      try {
+        handler.testHandleTypedFallback(originalException);
+      } catch (Throwable t) {
+        throw new RuntimeException(t);
+      }
+    });
   }
 
   @Test
-  void handleTypedFallback_shouldReturnNull_whenNoException() {
+  void handleTypedFallback_shouldReturnNull_whenNoException() throws Throwable {
     // When no exception, should return null
     Object result = handler.testHandleTypedFallback(null);
     assertNull(result);
   }
 
   @Test
-  void handleError_shouldLogAndThrowException() {
+  void handleError_shouldLogAndThrowException() throws Throwable {
     IllegalArgumentException originalException = new IllegalArgumentException("Test error");
 
     assertThrows(IllegalArgumentException.class, () -> handler.testHandleError(originalException));
   }
 
   @Test
-  void handleError_shouldThrowNullPointerException_whenNullThrowable() {
+  void handleError_shouldThrowNullPointerException_whenNullThrowable() throws Throwable {
     assertThrows(NullPointerException.class, () -> handler.testHandleError(null));
   }
 

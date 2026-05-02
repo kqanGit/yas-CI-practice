@@ -183,7 +183,7 @@ class UserAddressServiceTest {
 
     UserAddressVm result = userAddressService.createAddress(addressPostVm);
 
-    assertThat(result.addressId()).isEqualTo(ADDRESS_ID);
+    assertThat(result.addressGetVm().id()).isEqualTo(ADDRESS_ID);
     verify(userAddressRepository).save(any(UserAddress.class));
   }
 
@@ -206,7 +206,7 @@ class UserAddressServiceTest {
 
     UserAddressVm result = userAddressService.createAddress(addressPostVm);
 
-    assertThat(result.addressId()).isEqualTo(2L);
+    assertThat(result.addressGetVm().id()).isEqualTo(2L);
   }
 
   // ===== deleteAddress tests =====
