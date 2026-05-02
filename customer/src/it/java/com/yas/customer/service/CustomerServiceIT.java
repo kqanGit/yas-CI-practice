@@ -1,133 +1,149 @@
 package com.yas.customer.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
+import com.yas.commonlibrary.exception.AccessDeniedException;
+import com.yas.commonlibrary.exception.ForbiddenException;
 import com.yas.customer.config.KeycloakPropsConfig;
-import com.yas.customer.viewmodel.customer.CustomerPostVm;
-import jakarta.ws.rs.core.Response;
+import com.yas.customer.viewmodel.customer.CustomerAdminVm;
+import com.yas.customer.viewmodel.customer.CustomerListVm;
+import com.yas.customer.viewmodel.customer.CustomerProfileRequestVm;
+import com.yas.customer.viewmodel.customer.CustomerVm;
 import java.util.Collections;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.admin.client.resource.RealmResource;
-import org.keycloak.admin.client.resource.RoleMappingResource;
-import org.keycloak.admin.client.resource.RoleResource;
-import org.keycloak.admin.client.resource.RolesResource;
 import org.keycloak.admin.client.resource.UserResource;
 import org.keycloak.admin.client.resource.UsersResource;
-import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Primary;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.test.context.ContextConfiguration;
-import org.springframework.test.context.TestPropertySource;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 /**
  * Integration tests for CustomerService.
- * Uses PostgreSQL testcontainer and mocked Keycloak to test the service layer.
  */
-@SpringBootTest
-@TestPropertySource(properties = {
-    "spring.jpa.hibernate.ddl-auto=update",
-    "spring.liquibase.enabled=false",
-    "keycloak.auth-server-url=http://localhost:8080",
-    "keycloak.realm=Yas",
-    "keycloak.resource=customer-management"
-})
-@ContextConfiguration(classes = {CustomerServiceIT.KeycloakMockConfig.class})
 class CustomerServiceIT {
 
-  @Container
-  @ServiceConnection
-  static PostgreSQLContainer<?> postgresContainer = new PostgreSQLContainer<>("postgres:16");
+  private static final String REALM_NAME = "Yas";
+  private static final String USER_NAME = "test-user";
+  private static final String VALID_EMAIL = "test@example.com";
 
-  @Autowired
-  private CustomerService customerService;
-
-  @Autowired
   private Keycloak keycloak;
-
+  private KeycloakPropsConfig keycloakPropsConfig;
   private RealmResource realmResource;
   private UsersResource usersResource;
-
-  @Configuration
-  static class KeycloakMockConfig {
-    @Bean
-    @Primary
-    public Keycloak keycloak() {
-      Keycloak mockKeycloak = mock(Keycloak.class);
-      RealmResource realmResource = mock(RealmResource.class);
-      UsersResource usersResource = mock(UsersResource.class);
-
-      when(mockKeycloak.realm(any(String.class))).thenReturn(realmResource);
-      when(realmResource.users()).thenReturn(usersResource);
-
-      // Setup default response for search
-      when(usersResource.search(any(String.class), any(Boolean.class)))
-          .thenReturn(Collections.emptyList());
-      when(usersResource.search(any(), any(), any(), any(String.class), any(), any()))
-          .thenReturn(Collections.emptyList());
-
-      return mockKeycloak;
-    }
-
-    @Bean
-    @Primary
-    public KeycloakPropsConfig keycloakPropsConfig() {
-      KeycloakPropsConfig config = mock(KeycloakPropsConfig.class);
-      when(config.getRealm()).thenReturn("Yas");
-      return config;
-    }
-
-    @Bean
-    @Primary
-    public JwtDecoder jwtDecoder() {
-      Jwt mockJwt = Jwt.withTokenValue("mock-token")
-          .header("alg", "RS256")
-          .claim("sub", "test-user")
-          .claim("scope", "read write")
-          .build();
-      return token -> mockJwt;
-    }
-  }
+  private CustomerService customerService;
 
   @BeforeEach
   void setUp() {
+    keycloak = mock(Keycloak.class);
+    keycloakPropsConfig = mock(KeycloakPropsConfig.class);
     realmResource = mock(RealmResource.class);
     usersResource = mock(UsersResource.class);
-    when(keycloak.realm(any(String.class))).thenReturn(realmResource);
+
+    when(keycloakPropsConfig.getRealm()).thenReturn(REALM_NAME);
+    when(keycloak.realm(REALM_NAME)).thenReturn(realmResource);
     when(realmResource.users()).thenReturn(usersResource);
+
+    customerService = new CustomerService(keycloak, keycloakPropsConfig);
   }
 
-  @Test
-  void customerService_shouldBeLoaded() {
-    assertNotNull(customerService);
+  private UserRepresentation createUserRepresentation(String id, String username,
+      String email, String firstName, String lastName, boolean enabled) {
+    UserRepresentation user = new UserRepresentation();
+    user.setId(id);
+    user.setUsername(username);
+    user.setEmail(email);
+    user.setFirstName(firstName);
+    user.setLastName(lastName);
+    user.setEnabled(enabled);
+    user.setCreatedTimestamp(946684800000L);
+    return user;
   }
 
   @Test
   void getCustomers_shouldReturnCustomerListVm_whenNoUsers() {
     when(usersResource.search(any(), anyInt(), anyInt())).thenReturn(Collections.emptyList());
 
-    var result = customerService.getCustomers(1);
+    CustomerListVm result = customerService.getCustomers(1);
 
     assertNotNull(result);
-    assertTrue(result.totalUser() >= 0);
+    assertThat(result.totalUser()).isZero();
+    assertThat(result.totalPage()).isZero();
+  }
+
+  @Test
+  void getCustomers_shouldReturnCustomerList_whenUsersExist() {
+    List<UserRepresentation> users = List.of(
+        createUserRepresentation("1", "user1", "user1@test.com", "First1", "Last1", true),
+        createUserRepresentation("2", "user2", "user2@test.com", "First2", "Last2", true)
+    );
+    when(usersResource.search(any(), anyInt(), anyInt())).thenReturn(users);
+
+    CustomerListVm result = customerService.getCustomers(1);
+
+    assertNotNull(result);
+    assertThat(result.totalUser()).isEqualTo(2);
+    assertThat(result.customers()).hasSize(2);
+  }
+
+  @Test
+  void getCustomerByEmail_shouldReturnCustomer_whenUserExists() {
+    List<UserRepresentation> users = List.of(
+        createUserRepresentation("1", "user1", VALID_EMAIL, "First", "Last", true)
+    );
+    when(usersResource.search(VALID_EMAIL, true)).thenReturn(users);
+
+    CustomerAdminVm result = customerService.getCustomerByEmail(VALID_EMAIL);
+
+    assertNotNull(result);
+    assertThat(result.email()).isEqualTo(VALID_EMAIL);
+    assertThat(result.id()).isEqualTo("1");
+  }
+
+  @Test
+  void getCustomerProfile_shouldReturnCustomerVm_whenUserExists() {
+    UserRepresentation user = createUserRepresentation(USER_NAME, USER_NAME, "test@test.com", "John", "Doe", true);
+    UserResource userResource = mock(UserResource.class);
+    when(usersResource.get(USER_NAME)).thenReturn(userResource);
+    when(userResource.toRepresentation()).thenReturn(user);
+
+    CustomerVm result = customerService.getCustomerProfile(USER_NAME);
+
+    assertNotNull(result);
+    assertThat(result.firstName()).isEqualTo("John");
+    assertThat(result.lastName()).isEqualTo("Doe");
+  }
+
+  @Test
+  void updateCustomer_shouldUpdateUser_whenUserExists() {
+    UserRepresentation user = createUserRepresentation(USER_NAME, USER_NAME, "old@test.com", "OldFirst", "OldLast", true);
+    UserResource userResource = mock(UserResource.class);
+    when(usersResource.get(USER_NAME)).thenReturn(userResource);
+    when(userResource.toRepresentation()).thenReturn(user);
+
+    CustomerProfileRequestVm request = new CustomerProfileRequestVm("NewFirst", "NewLast", "new@test.com");
+    customerService.updateCustomer(USER_NAME, request);
+
+    verify(userResource).update(any(UserRepresentation.class));
+  }
+
+  @Test
+  void deleteCustomer_shouldDisableUser_whenUserExists() {
+    UserRepresentation user = createUserRepresentation(USER_NAME, USER_NAME, "test@test.com", "First", "Last", true);
+    UserResource userResource = mock(UserResource.class);
+    when(usersResource.get(USER_NAME)).thenReturn(userResource);
+    when(userResource.toRepresentation()).thenReturn(user);
+
+    customerService.deleteCustomer(USER_NAME);
+
+    verify(userResource).update(any(UserRepresentation.class));
   }
 
   @Test
@@ -135,8 +151,7 @@ class CustomerServiceIT {
     var credentials = CustomerService.createPasswordCredentials("testPassword");
 
     assertNotNull(credentials);
-    assertTrue(credentials.getType().equals("password"));
-    assertTrue(credentials.getValue().equals("testPassword"));
-    assertTrue(credentials.isTemporary() == false);
+    assertThat(credentials.getType()).isEqualTo("password");
+    assertThat(credentials.getValue()).isEqualTo("testPassword");
   }
 }

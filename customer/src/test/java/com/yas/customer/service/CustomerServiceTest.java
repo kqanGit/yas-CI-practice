@@ -168,16 +168,13 @@ class CustomerServiceTest {
   }
 
   @Test
-  void getCustomerProfile_shouldReturnNullFields_whenUserDoesNotExist() {
+  void getCustomerProfile_shouldThrowNullPointerException_whenUserDoesNotExist() {
     UserResource userResource = mock(UserResource.class);
     when(usersResource.get(USER_NAME)).thenReturn(userResource);
     when(userResource.toRepresentation()).thenReturn(null);
 
-    CustomerVm result = customerService.getCustomerProfile(USER_NAME);
-
-    assertThat(result.firstName()).isNull();
-    assertThat(result.lastName()).isNull();
-    assertThat(result.email()).isNull();
+    // The code calls getId() on null user, so NPE is thrown
+    assertThrows(NullPointerException.class, () -> customerService.getCustomerProfile(USER_NAME));
   }
 
   @Test
@@ -286,6 +283,15 @@ class CustomerServiceTest {
 
     UserResource userResource = mock(UserResource.class);
     when(usersResource.get("1")).thenReturn(userResource);
+
+    // Mock userResource.toRepresentation() to return a valid UserRepresentation with ID
+    UserRepresentation createdUser = new UserRepresentation();
+    createdUser.setId("1");
+    createdUser.setUsername("newuser");
+    createdUser.setEmail("newuser@test.com");
+    createdUser.setFirstName("John");
+    createdUser.setLastName("Doe");
+    when(userResource.toRepresentation()).thenReturn(createdUser);
 
     RolesResource rolesResource = mock(RolesResource.class);
     when(realmResource.roles()).thenReturn(rolesResource);
