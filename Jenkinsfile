@@ -195,6 +195,21 @@ pipeline {
         }
 
         // ───────────────────────────────────────────────────────
+        // STAGE: COVERAGE CHECK (70%)
+        // Enforce minimum 70% line coverage per service
+        // Configured via JaCoCo check rule in pom.xml
+        // ───────────────────────────────────────────────────────
+        stage('Coverage Check') {
+            when {
+                expression { return env.SKIP_BUILD != 'true' }
+            }
+            steps {
+                echo ">>> Checking coverage >= 70% for: ${env.SERVICES_TO_BUILD}"
+                sh "mvn jacoco:check -pl ${env.SERVICES_TO_BUILD}"
+            }
+        }
+
+        // ───────────────────────────────────────────────────────
         // STAGE 8: SNYK SCAN
         // Scan dependencies to secure system if dependencies is not safe
         // ───────────────────────────────────────────────────────
