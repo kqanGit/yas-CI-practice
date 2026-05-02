@@ -1,173 +1,171 @@
 package com.yas.customer.service;
 
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doThrow;
+import static com.yas.customer.util.SecurityContextUtils.setUpSecurityContext;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
+import com.yas.customer.config.ServiceUrlConfig;
 import com.yas.customer.viewmodel.address.AddressDetailVm;
 import com.yas.customer.viewmodel.address.AddressPostVm;
 import com.yas.customer.viewmodel.address.AddressVm;
-import io.github.resilience4j.circuitbreaker.CircuitBreaker;
-import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import java.net.URI;
 import java.util.Collections;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.context.SecurityContextHolder;
+import org.mockito.Mockito;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.util.UriComponentsBuilder;
 
-@ExtendWith(MockitoExtension.class)
 class LocationServiceTest {
 
-  @Mock
-  private org.springframework.web.client.RestClient restClient;
+    private RestClient restClient;
 
-  @Mock
-  private com.yas.customer.config.ServiceUrlConfig serviceUrlConfig;
+    private ServiceUrlConfig serviceUrlConfig;
 
-  private LocationService locationService;
+    private LocationService locationService;
 
-  private static final String LOCATION_URL = "http://api.yas.local/location";
+    private RestClient.ResponseSpec responseSpec;
 
-  @BeforeEach
-  void setUp() {
-    locationService = new LocationService(restClient, serviceUrlConfig);
-  }
+    private static final String INVENTORY_URL = "http://api.yas.local/inventory";
 
-  private void setSecurityContext() {
-    UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
-        "testuser", null, Collections.emptyList());
-    SecurityContextHolder.getContext().setAuthentication(auth);
-  }
-
-  // ===== Test circuit breaker behavior via LocationService =====
-
-  @Test
-  void getAddressesByIdList_shouldSucceed_whenCircuitBreakerClosed() {
-    setSecurityContext();
-    when(serviceUrlConfig.location()).thenReturn(LOCATION_URL);
-
-    AddressDetailVm addressDetail = new AddressDetailVm(1L, "Contact", "1234567890", "123 Main St",
-        "New York", "10001", 1L, "District", 1L, "State", 1L, "USA");
-
-    org.springframework.web.client.RestClient.ResponseSpec responseSpec = mock(
-        org.springframework.web.client.RestClient.ResponseSpec.class);
-    org.springframework.web.client.RestClient.RequestHeadersUriSpec requestHeadersUriSpec = mock(
-        org.springframework.web.client.RestClient.RequestHeadersUriSpec.class);
-    when(restClient.get()).thenReturn(requestHeadersUriSpec);
-    when(requestHeadersUriSpec.uri(any())).thenReturn(requestHeadersUriSpec);
-    when(requestHeadersUriSpec.headers(any())).thenReturn(requestHeadersUriSpec);
-    when(requestHeadersUriSpec.retrieve()).thenReturn(responseSpec);
-    when(responseSpec.body(new org.springframework.core.ParameterizedTypeReference<List<AddressDetailVm>>() {}))
-        .thenReturn(List.of(addressDetail));
-
-    List<Long> ids = List.of(1L);
-    List<AddressDetailVm> result = locationService.getAddressesByIdList(ids);
-
-    assertDoesNotThrow(() -> result);
-  }
-
-  @Test
-  void getAddressById_shouldSucceed_whenCircuitBreakerClosed() {
-    setSecurityContext();
-    when(serviceUrlConfig.location()).thenReturn(LOCATION_URL);
-
-    AddressDetailVm addressDetail = new AddressDetailVm(1L, "Contact", "1234567890", "123 Main St",
-        "New York", "10001", 1L, "District", 1L, "State", 1L, "USA");
-
-    org.springframework.web.client.RestClient.ResponseSpec responseSpec = mock(
-        org.springframework.web.client.RestClient.ResponseSpec.class);
-    org.springframework.web.client.RestClient.RequestHeadersUriSpec requestHeadersUriSpec = mock(
-        org.springframework.web.client.RestClient.RequestHeadersUriSpec.class);
-    when(restClient.get()).thenReturn(requestHeadersUriSpec);
-    when(requestHeadersUriSpec.uri(any())).thenReturn(requestHeadersUriSpec);
-    when(requestHeadersUriSpec.headers(any())).thenReturn(requestHeadersUriSpec);
-    when(requestHeadersUriSpec.retrieve()).thenReturn(responseSpec);
-    when(responseSpec.body(AddressDetailVm.class)).thenReturn(addressDetail);
-
-    AddressDetailVm result = locationService.getAddressById(1L);
-
-    assertDoesNotThrow(() -> result);
-  }
-
-  @Test
-  void createAddress_shouldSucceed_whenCircuitBreakerClosed() {
-    setSecurityContext();
-    when(serviceUrlConfig.location()).thenReturn(LOCATION_URL);
-
-    AddressVm addressVm = new AddressVm(1L, "Contact", "1234567890", "123 Main St",
-        "New York", "10001", 1L, 1L, 1L);
-
-    org.springframework.web.client.RestClient.ResponseSpec responseSpec = mock(
-        org.springframework.web.client.RestClient.ResponseSpec.class);
-    org.springframework.web.client.RestClient.RequestBodyUriSpec requestBodyUriSpec = mock(
-        org.springframework.web.client.RestClient.RequestBodyUriSpec.class);
-    when(restClient.post()).thenReturn(requestBodyUriSpec);
-    when(requestBodyUriSpec.uri(any())).thenReturn(requestBodyUriSpec);
-    when(requestBodyUriSpec.headers(any())).thenReturn(requestBodyUriSpec);
-    when(requestBodyUriSpec.body(any())).thenReturn(requestBodyUriSpec);
-    when(requestBodyUriSpec.retrieve()).thenReturn(responseSpec);
-    when(responseSpec.body(AddressVm.class)).thenReturn(addressVm);
-
-    AddressPostVm addressPostVm = new AddressPostVm("Contact", "1234567890", "123 Main St",
-        "New York", "10001", 1L, 1L, 1L);
-
-    AddressVm result = locationService.createAddress(addressPostVm);
-
-    assertDoesNotThrow(() -> result);
-  }
-
-  // ===== Test Fallback behavior =====
-
-  @Test
-  void handleTypedFallback_shouldThrowOriginalException() {
-    TestCircuitBreakHandler handler = new TestCircuitBreakHandler();
-
-    RuntimeException ex = new RuntimeException("test");
-    assertThrows(RuntimeException.class, () -> handler.testHandleTypedFallback(ex));
-  }
-
-  @Test
-  void handleBodilessFallback_shouldThrowOriginalException() {
-    TestCircuitBreakHandler handler = new TestCircuitBreakHandler();
-
-    RuntimeException ex = new RuntimeException("test");
-    assertThrows(RuntimeException.class, () -> handler.testHandleBodilessFallback(ex));
-  }
-
-  @Test
-  void handleError_shouldThrowOriginalException() {
-    TestCircuitBreakHandler handler = new TestCircuitBreakHandler();
-
-    IllegalArgumentException ex = new IllegalArgumentException("test");
-    assertThrows(IllegalArgumentException.class, () -> handler.testHandleError(ex));
-  }
-
-  @Test
-  void handleTypedFallback_shouldReturnNull_whenNullThrowable() {
-    TestCircuitBreakHandler handler = new TestCircuitBreakHandler();
-
-    Object result = handler.testHandleTypedFallback(null);
-    assertNull(result);
-  }
-
-  // Test implementation
-  private static class TestCircuitBreakHandler extends AbstractCircuitBreakFallbackHandler {
-    public void testHandleBodilessFallback(Throwable throwable) throws Throwable {
-      handleBodilessFallback(throwable);
+    @BeforeEach
+    void setUp() {
+        restClient = mock(RestClient.class);
+        serviceUrlConfig = mock(ServiceUrlConfig.class);
+        locationService = new LocationService(restClient, serviceUrlConfig);
+        responseSpec = Mockito.mock(RestClient.ResponseSpec.class);
     }
-    public Object testHandleTypedFallback(Throwable throwable) throws Throwable {
-      return handleTypedFallback(throwable);
+
+    @Test
+    void testGetAddressesByIdList() {
+
+        List<Long> ids = List.of(1L, 2L, 3L);
+
+        when(serviceUrlConfig.location()).thenReturn(INVENTORY_URL);
+        URI uri = UriComponentsBuilder.fromUriString(INVENTORY_URL)
+            .path("/storefront/addresses")
+            .queryParam("ids", ids)
+            .build()
+            .toUri();
+
+        setUpSecurityContext("test");
+        RestClient.RequestHeadersUriSpec requestHeadersUriSpec = Mockito.mock(RestClient.RequestHeadersUriSpec.class);
+        when(restClient.get()).thenReturn(requestHeadersUriSpec);
+        when(requestHeadersUriSpec.uri(uri)).thenReturn(requestHeadersUriSpec);
+        when(requestHeadersUriSpec.headers(any())).thenReturn(requestHeadersUriSpec);
+        when(requestHeadersUriSpec.retrieve()).thenReturn(responseSpec);
+
+        AddressDetailVm addressDetail = getAddressDetailVm();
+        when(responseSpec.body(new ParameterizedTypeReference<List<AddressDetailVm>>() {}))
+            .thenReturn(Collections.singletonList(addressDetail));
+
+        List<AddressDetailVm> result = locationService.getAddressesByIdList(ids);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0)).isEqualTo(addressDetail);
+
     }
-    public void testHandleError(Throwable throwable) throws Throwable {
-      handleError(throwable);
+
+    @Test
+    void testGetAddressById() {
+
+        Long id = 1L;
+        when(serviceUrlConfig.location()).thenReturn(INVENTORY_URL);
+        URI uri = UriComponentsBuilder.fromUriString(INVENTORY_URL)
+            .path("/storefront/addresses/{id}")
+            .buildAndExpand(id)
+            .toUri();
+
+        setUpSecurityContext("test");
+        RestClient.RequestHeadersUriSpec requestHeadersUriSpec = Mockito.mock(RestClient.RequestHeadersUriSpec.class);
+        when(restClient.get()).thenReturn(requestHeadersUriSpec);
+        when(requestHeadersUriSpec.uri(uri)).thenReturn(requestHeadersUriSpec);
+        when(requestHeadersUriSpec.headers(any())).thenReturn(requestHeadersUriSpec);
+        when(requestHeadersUriSpec.retrieve()).thenReturn(responseSpec);
+
+        AddressDetailVm addressDetail = getAddressDetailVm();
+        when(responseSpec.body(AddressDetailVm.class))
+            .thenReturn(addressDetail);
+
+        AddressDetailVm result = locationService.getAddressById(id);
+
+        assertThat(result).isEqualTo(addressDetail);
     }
-  }
+
+    @Test
+    void testCreateAddress() {
+
+        when(serviceUrlConfig.location()).thenReturn(INVENTORY_URL);
+        URI uri = UriComponentsBuilder.fromUriString(INVENTORY_URL)
+            .path("/storefront/addresses")
+            .build()
+            .toUri();
+
+        setUpSecurityContext("test");
+
+        RestClient.RequestBodyUriSpec requestBodyUriSpec = mock(RestClient.RequestBodyUriSpec.class);
+        when(restClient.post()).thenReturn(requestBodyUriSpec);
+        when(requestBodyUriSpec.uri(uri)).thenReturn(requestBodyUriSpec);
+
+        when(requestBodyUriSpec.headers(any())).thenReturn(requestBodyUriSpec);
+        AddressPostVm addressPostVm = getAddressPostVm();
+        when(requestBodyUriSpec.body(addressPostVm)).thenReturn(requestBodyUriSpec);
+        when(requestBodyUriSpec.retrieve()).thenReturn(responseSpec);
+        AddressVm addressVm = getAddressVm();
+        when(responseSpec.body(AddressVm.class)).thenReturn(addressVm);
+
+        AddressVm result = locationService.createAddress(addressPostVm);
+
+        assertEquals(addressVm, result);
+    }
+
+    private AddressDetailVm getAddressDetailVm() {
+        return new AddressDetailVm(
+            1L,
+            "John Doe",
+            "+1234567890",
+            "123 Elm Street",
+            "Springfield",
+            "62701",
+            101L,
+            "Downtown",
+            201L,
+            "Illinois",
+            301L,
+            "United States"
+        );
+    }
+
+    private AddressPostVm getAddressPostVm() {
+        return new AddressPostVm(
+            "Jane Smith",
+            "+1987654321",
+            "456 Oak Avenue",
+            "Metropolis",
+            "54321",
+            102L,
+            202L,
+            302L
+        );
+    }
+
+    private AddressVm getAddressVm() {
+        return new AddressVm(
+            1L,
+            "Alice Johnson",
+            "+1239874560",
+            "789 Pine Road",
+            "Gotham",
+            "10001",
+            103L,
+            203L,
+            303L
+        );
+    }
+
 }
