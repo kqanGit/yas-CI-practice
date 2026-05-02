@@ -116,9 +116,9 @@ pipeline {
                     }
 
                     if (servicesToBuild.isEmpty()) {
-                        env.SERVICES_TO_BUILD = allServices.toList().join(',')
-                        env.SKIP_BUILD = 'false'
-                        echo ">>> No specific service detected. Building ALL services."
+                        env.SERVICES_TO_BUILD = ''
+                        env.SKIP_BUILD = 'true'
+                        echo ">>> No service changes detected. Skipping build/test/scan."
                     } else {
                         // Maven uses comma-separated module list: -pl cart,media,order
                         env.SERVICES_TO_BUILD = servicesToBuild.join(',')
@@ -199,6 +199,9 @@ pipeline {
         // Scan dependencies to secure system if dependencies is not safe
         // ───────────────────────────────────────────────────────
         stage('Snyk Scan') {
+            when {
+                expression { return env.SKIP_BUILD != 'true' }
+            }
             steps {
                 withCredentials([string(credentialsId: 'snyk_connection', variable: 'SNYK_TOKEN')]) {
                     sh '''
@@ -216,17 +219,20 @@ pipeline {
         // STAGE 6: SONARQUBE ANALYSIS
         // Run static code analysis and send results to SonarQube
         // ───────────────────────────────────────────────────────
-         stage('SonarQube Analysis') {
+        stage('SonarQube Analysis') {
+            when {
+                expression { return env.SKIP_BUILD != 'true' }
+            }
             steps {
                 // Generate JaCoCo XML reports from .exec files (needed for SonarQube)
                 sh "mvn jacoco:report -pl ${env.SERVICES_TO_BUILD} -am"
 
                 withSonarQubeEnv('sonarqube') {
-                    sh '''
-                    mvn sonar:sonar \
+                    sh """mvn sonar:sonar \
+                    -pl ${env.SERVICES_TO_BUILD} -am \
                     -Dsonar.projectKey=yas-project \
                     -Dsonar.coverage.jacoco.xmlReportPaths=**/target/site/jacoco/jacoco.xml
-                    '''
+                    """
                 }
             }
         }
@@ -236,6 +242,9 @@ pipeline {
         // Wait sonarqube return result about test coverage
         // ───────────────────────────────────────────────────────
         stage("Quality Gate") {
+            when {
+                expression { return env.SKIP_BUILD != 'true' }
+            }
             steps {
                 timeout(time: 2, unit: 'MINUTES') {
                     waitForQualityGate abortPipeline: true
