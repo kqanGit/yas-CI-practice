@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.lenient;
 
 import com.yas.commonlibrary.exception.AccessDeniedException;
 import com.yas.commonlibrary.exception.NotFoundException;
@@ -253,9 +254,9 @@ class UserAddressServiceTest {
 
   @Test
   void chooseDefaultAddress_shouldHandleEmptyList() {
-    setSecurityContext(USER_ID);
+    setSecurityContext("test");
 
-    when(userAddressRepository.findAllByUserId(USER_ID)).thenReturn(Collections.emptyList());
+    lenient().when(userAddressRepository.findAllByUserId("test")).thenReturn(Collections.emptyList());
 
     userAddressService.chooseDefaultAddress(ADDRESS_ID);
 

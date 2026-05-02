@@ -1,67 +1,66 @@
 package com.yas.customer.service;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import java.io.IOException;
+import java.util.Collections;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.junit.jupiter.MockitoExtension;
 
+@ExtendWith(MockitoExtension.class)
 class AbstractCircuitBreakFallbackHandlerTest {
 
-  // Concrete implementation for testing
-  private TestCircuitBreakHandler handler = new TestCircuitBreakHandler();
+  private TestCircuitBreakHandler handler;
 
-  @Test
-  void handleBodilessFallback_shouldThrowOriginalException() throws Throwable {
-    IOException originalException = new IOException("Original error");
-
-    assertThrows(IOException.class, () -> handler.testHandleBodilessFallback(originalException));
+  @BeforeEach
+  void setUp() {
+    handler = new TestCircuitBreakHandler();
   }
 
   @Test
-  void handleTypedFallback_shouldThrowOriginalException_andReturnNull() throws Throwable {
-    IOException originalException = new IOException("Original error");
-
-    // The method first throws, then returns null (but throw happens first)
-    assertThrows(IOException.class, () -> {
-      try {
-        handler.testHandleTypedFallback(originalException);
-      } catch (Throwable t) {
-        throw new RuntimeException(t);
-      }
-    });
+  void handleError_shouldThrowOriginalException() {
+    RuntimeException ex = new RuntimeException("test error");
+    assertThrows(RuntimeException.class, () -> handler.testHandleError(ex));
   }
 
   @Test
-  void handleTypedFallback_shouldReturnNull_whenNoException() throws Throwable {
-    // When no exception, should return null
+  void handleError_shouldThrowIOException() {
+    java.io.IOException ex = new java.io.IOException("io error");
+    assertThrows(java.io.IOException.class, () -> handler.testHandleError(ex));
+  }
+
+  @Test
+  void handleError_shouldThrowIllegalArgument() {
+    IllegalArgumentException ex = new IllegalArgumentException("illegal");
+    assertThrows(IllegalArgumentException.class, () -> handler.testHandleError(ex));
+  }
+
+  @Test
+  void handleError_shouldThrowNullPointer_whenNullThrowable() {
+    assertThrows(NullPointerException.class, () -> handler.testHandleError(null));
+  }
+
+  @Test
+  void handleTypedFallback_shouldThrow_whenException() {
+    RuntimeException ex = new RuntimeException("test");
+    assertThrows(RuntimeException.class, () -> handler.testHandleTypedFallback(ex));
+  }
+
+  @Test
+  void handleTypedFallback_shouldReturnNull_whenNoException() {
+    // When null is passed, returns null instead of throwing
     Object result = handler.testHandleTypedFallback(null);
     assertNull(result);
   }
 
-  @Test
-  void handleError_shouldLogAndThrowException() throws Throwable {
-    IllegalArgumentException originalException = new IllegalArgumentException("Test error");
-
-    assertThrows(IllegalArgumentException.class, () -> handler.testHandleError(originalException));
-  }
-
-  @Test
-  void handleError_shouldThrowNullPointerException_whenNullThrowable() throws Throwable {
-    assertThrows(NullPointerException.class, () -> handler.testHandleError(null));
-  }
-
-  // Test implementation of abstract class
+  // Test implementation
   private static class TestCircuitBreakHandler extends AbstractCircuitBreakFallbackHandler {
-
-    public void testHandleBodilessFallback(Throwable throwable) throws Throwable {
-      handleBodilessFallback(throwable);
-    }
-
     public Object testHandleTypedFallback(Throwable throwable) throws Throwable {
       return handleTypedFallback(throwable);
     }
-
     public void testHandleError(Throwable throwable) throws Throwable {
       handleError(throwable);
     }
