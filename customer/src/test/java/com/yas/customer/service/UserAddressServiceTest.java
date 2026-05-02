@@ -1,12 +1,12 @@
 package com.yas.customer.service;
 
+import static com.yas.customer.util.SecurityContextUtils.setUpSecurityContext;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.mockito.Mockito.lenient;
 
 import com.yas.commonlibrary.exception.AccessDeniedException;
 import com.yas.commonlibrary.exception.NotFoundException;
@@ -17,249 +17,239 @@ import com.yas.customer.viewmodel.address.AddressDetailVm;
 import com.yas.customer.viewmodel.address.AddressPostVm;
 import com.yas.customer.viewmodel.address.AddressVm;
 import com.yas.customer.viewmodel.useraddress.UserAddressVm;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 @ExtendWith(MockitoExtension.class)
 class UserAddressServiceTest {
 
-  @Mock
-  private UserAddressRepository userAddressRepository;
+    @Mock
+    private UserAddressRepository userAddressRepository;
 
-  @Mock
-  private LocationService locationService;
+    @Mock
+    private LocationService locationService;
 
-  private UserAddressService userAddressService;
+    @InjectMocks
+    private UserAddressService userAddressService;
 
-  private static final String USER_ID = "user123";
-  private static final String ANONYMOUS_USER = "anonymousUser";
-  private static final Long ADDRESS_ID = 1L;
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
+    }
 
-  @BeforeEach
-  void setUp() {
-    userAddressService = new UserAddressService(userAddressRepository, locationService);
-  }
+    @Test
+    void getUserAddressList_anonymousUser_throwsAccessDenied() {
+        setUpSecurityContext("anonymousUser");
 
-  private void setSecurityContext(String userId) {
-    UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
-        userId, null, Collections.emptyList());
-    SecurityContextHolder.getContext().setAuthentication(auth);
-  }
+        assertThrows(AccessDeniedException.class, () -> userAddressService.getUserAddressList());
+    }
 
-  private AddressDetailVm createAddressDetailVm(Long id) {
-    return new AddressDetailVm(id, "Contact", "1234567890", "123 Main St",
-        "New York", "10001", 1L, "District 1", 1L, "State 1", 1L, "USA");
-  }
+    @Test
+    void getUserAddressList_mapsAndSortsActiveFirst() {
+        setUpSecurityContext("user-1");
 
-  private UserAddress createUserAddress(Long id, Long addressId, Boolean isActive) {
-    return UserAddress.builder()
-        .id(id)
-        .userId(USER_ID)
-        .addressId(addressId)
-        .isActive(isActive)
-        .build();
-  }
+        List<UserAddress> userAddresses = List.of(
+            UserAddress.builder().id(1L).userId("user-1").addressId(10L).isActive(false).build(),
+            UserAddress.builder().id(2L).userId("user-1").addressId(20L).isActive(true).build()
+        );
 
-  // ===== getUserAddressList tests =====
+        when(userAddressRepository.findAllByUserId("user-1")).thenReturn(userAddresses);
+        when(locationService.getAddressesByIdList(List.of(10L, 20L)))
+            .thenReturn(List.of(buildAddressDetail(10L), buildAddressDetail(20L)));
 
-  @Test
-  void getUserAddressList_shouldReturnActiveAddresses_sortedByActive() {
-    setSecurityContext(USER_ID);
+        List<ActiveAddressVm> result = userAddressService.getUserAddressList();
 
-    List<UserAddress> userAddresses = List.of(
-        createUserAddress(1L, 1L, false),
-        createUserAddress(2L, 2L, true)
-    );
-    when(userAddressRepository.findAllByUserId(USER_ID)).thenReturn(userAddresses);
+        assertThat(result).hasSize(2);
+        assertThat(result.getFirst().isActive()).isTrue();
+        assertThat(result.getFirst().id()).isEqualTo(20L);
+        assertThat(result.get(1).isActive()).isFalse();
+        assertThat(result.get(1).id()).isEqualTo(10L);
+    }
 
-    List<AddressDetailVm> addressDetails = List.of(
-        createAddressDetailVm(1L),
-        createAddressDetailVm(2L)
-    );
-    when(locationService.getAddressesByIdList(anyList())).thenReturn(addressDetails);
+    @Test
+    void getAddressDefault_anonymousUser_throwsAccessDenied() {
+        setUpSecurityContext("anonymousUser");
 
-    List<ActiveAddressVm> result = userAddressService.getUserAddressList();
+        assertThrows(AccessDeniedException.class, () -> userAddressService.getAddressDefault());
+    }
 
-    // Should be sorted with active first (reversed)
-    assertThat(result).hasSize(2);
-    assertThat(result.get(0).isActive()).isTrue();
-    assertThat(result.get(1).isActive()).isFalse();
-  }
+    @Test
+    void getAddressDefault_notFound_throwsNotFound() {
+        setUpSecurityContext("user-1");
+        when(userAddressRepository.findByUserIdAndIsActiveTrue("user-1")).thenReturn(Optional.empty());
 
-  @Test
-  void getUserAddressList_shouldThrowAccessDeniedException_whenAnonymousUser() {
-    setSecurityContext(ANONYMOUS_USER);
+        NotFoundException thrown = assertThrows(NotFoundException.class, () -> userAddressService.getAddressDefault());
+        assertThat(thrown.getMessage()).contains("User address not found");
+    }
 
-    assertThrows(AccessDeniedException.class, () -> userAddressService.getUserAddressList());
-  }
+    @Test
+    void getAddressDefault_returnsAddressDetail() {
+        setUpSecurityContext("user-1");
 
-  @Test
-  void getUserAddressList_shouldReturnEmptyList_whenNoAddresses() {
-    setSecurityContext(USER_ID);
+        UserAddress activeAddress = UserAddress.builder()
+            .id(3L)
+            .userId("user-1")
+            .addressId(99L)
+            .isActive(true)
+            .build();
 
-    when(userAddressRepository.findAllByUserId(USER_ID)).thenReturn(Collections.emptyList());
-    when(locationService.getAddressesByIdList(anyList())).thenReturn(Collections.emptyList());
+        when(userAddressRepository.findByUserIdAndIsActiveTrue("user-1"))
+            .thenReturn(Optional.of(activeAddress));
 
-    List<ActiveAddressVm> result = userAddressService.getUserAddressList();
+        AddressDetailVm addressDetail = buildAddressDetail(99L);
+        when(locationService.getAddressById(99L)).thenReturn(addressDetail);
 
-    assertThat(result).isEmpty();
-  }
+        AddressDetailVm result = userAddressService.getAddressDefault();
 
-  @Test
-  void getUserAddressList_shouldMatchAddressesById() {
-    setSecurityContext(USER_ID);
+        assertSame(addressDetail, result);
+    }
 
-    List<UserAddress> userAddresses = List.of(createUserAddress(1L, 10L, true));
-    when(userAddressRepository.findAllByUserId(USER_ID)).thenReturn(userAddresses);
+    @Test
+    void createAddress_firstAddress_setsActiveTrue() {
+        setUpSecurityContext("user-1");
 
-    AddressDetailVm addressDetail = createAddressDetailVm(10L);
-    when(locationService.getAddressesByIdList(anyList())).thenReturn(List.of(addressDetail));
+        when(userAddressRepository.findAllByUserId("user-1")).thenReturn(List.of());
 
-    List<ActiveAddressVm> result = userAddressService.getUserAddressList();
-
-    assertThat(result).hasSize(1);
-    assertThat(result.get(0).id()).isEqualTo(10L);
-  }
-
-  // ===== getAddressDefault tests =====
-
-  @Test
-  void getAddressDefault_shouldReturnDefaultAddress() {
-    setSecurityContext(USER_ID);
-
-    UserAddress userAddress = createUserAddress(1L, ADDRESS_ID, true);
-    when(userAddressRepository.findByUserIdAndIsActiveTrue(USER_ID))
-        .thenReturn(Optional.of(userAddress));
-
-    AddressDetailVm addressDetail = createAddressDetailVm(ADDRESS_ID);
-    when(locationService.getAddressById(ADDRESS_ID)).thenReturn(addressDetail);
-
-    AddressDetailVm result = userAddressService.getAddressDefault();
-
-    assertThat(result.id()).isEqualTo(ADDRESS_ID);
-  }
-
-  @Test
-  void getAddressDefault_shouldThrowAccessDeniedException_whenAnonymousUser() {
-    setSecurityContext(ANONYMOUS_USER);
-
-    assertThrows(AccessDeniedException.class, () -> userAddressService.getAddressDefault());
-  }
-
-  @Test
-  void getAddressDefault_shouldThrowNotFoundException_whenNoDefaultAddress() {
-    setSecurityContext(USER_ID);
-
-    when(userAddressRepository.findByUserIdAndIsActiveTrue(USER_ID))
-        .thenReturn(Optional.empty());
-
-    assertThrows(NotFoundException.class, () -> userAddressService.getAddressDefault());
-  }
-
-  // ===== createAddress tests =====
-
-  @Test
-  void createAddress_shouldCreateFirstAddress_asActive() {
-    setSecurityContext(USER_ID);
-
-    when(userAddressRepository.findAllByUserId(USER_ID)).thenReturn(Collections.emptyList());
-
-    AddressVm addressVm = new AddressVm(ADDRESS_ID, "Contact", "1234567890", "123 Main St",
-        "New York", "10001", 1L, 1L, 1L);
-    when(locationService.createAddress(any(AddressPostVm.class))).thenReturn(addressVm);
-
-    UserAddress savedUserAddress = createUserAddress(1L, ADDRESS_ID, true);
-    when(userAddressRepository.save(any(UserAddress.class))).thenReturn(savedUserAddress);
-
-    AddressPostVm addressPostVm = new AddressPostVm("Contact", "1234567890", "123 Main St",
-        "New York", "10001", 1L, 1L, 1L);
-
-    UserAddressVm result = userAddressService.createAddress(addressPostVm);
-
-    assertThat(result.addressGetVm().id()).isEqualTo(ADDRESS_ID);
-    verify(userAddressRepository).save(any(UserAddress.class));
-  }
-
-  @Test
-  void createAddress_shouldCreateSubsequentAddress_asInactive() {
-    setSecurityContext(USER_ID);
-
-    List<UserAddress> existingAddresses = List.of(createUserAddress(1L, 1L, true));
-    when(userAddressRepository.findAllByUserId(USER_ID)).thenReturn(existingAddresses);
-
-    AddressVm addressVm = new AddressVm(2L, "Contact", "1234567890", "123 Main St",
-        "New York", "10001", 1L, 1L, 1L);
-    when(locationService.createAddress(any(AddressPostVm.class))).thenReturn(addressVm);
-
-    UserAddress savedUserAddress = createUserAddress(2L, 2L, false);
-    when(userAddressRepository.save(any(UserAddress.class))).thenReturn(savedUserAddress);
-
-    AddressPostVm addressPostVm = new AddressPostVm("Contact", "1234567890", "123 Main St",
-        "New York", "10001", 1L, 1L, 1L);
-
-    UserAddressVm result = userAddressService.createAddress(addressPostVm);
-
-    assertThat(result.addressGetVm().id()).isEqualTo(2L);
-  }
-
-  // ===== deleteAddress tests =====
-
-  @Test
-  void deleteAddress_shouldDeleteAddress() {
-    setSecurityContext(USER_ID);
-
-    UserAddress userAddress = createUserAddress(1L, ADDRESS_ID, true);
-    when(userAddressRepository.findOneByUserIdAndAddressId(USER_ID, ADDRESS_ID))
-        .thenReturn(userAddress);
-
-    userAddressService.deleteAddress(ADDRESS_ID);
-
-    verify(userAddressRepository).delete(userAddress);
-  }
-
-  @Test
-  void deleteAddress_shouldThrowNotFoundException_whenAddressNotFound() {
-    setSecurityContext(USER_ID);
-
-    when(userAddressRepository.findOneByUserIdAndAddressId(USER_ID, ADDRESS_ID))
-        .thenReturn(null);
-
-    assertThrows(NotFoundException.class, () -> userAddressService.deleteAddress(ADDRESS_ID));
-  }
-
-  // ===== chooseDefaultAddress tests =====
-
-  @Test
-  void chooseDefaultAddress_shouldSetDefaultAddress() {
-    setSecurityContext(USER_ID);
-
-    List<UserAddress> userAddresses = List.of(
-        createUserAddress(1L, 1L, false),
-        createUserAddress(2L, 2L, false)
-    );
-    when(userAddressRepository.findAllByUserId(USER_ID)).thenReturn(userAddresses);
-
-    userAddressService.chooseDefaultAddress(2L);
-
-    verify(userAddressRepository).saveAll(userAddresses);
-  }
-
-  @Test
-  void chooseDefaultAddress_shouldHandleEmptyList() {
-    setSecurityContext("test");
-
-    lenient().when(userAddressRepository.findAllByUserId("test")).thenReturn(Collections.emptyList());
-
-    userAddressService.chooseDefaultAddress(ADDRESS_ID);
-
-    verify(userAddressRepository).saveAll(Collections.emptyList());
-  }
+        AddressPostVm postVm = buildAddressPostVm();
+        AddressVm addressVm = buildAddressVm(5L);
+        when(locationService.createAddress(postVm)).thenReturn(addressVm);
+
+        when(userAddressRepository.save(any(UserAddress.class))).thenAnswer(invocation -> {
+            UserAddress saved = invocation.getArgument(0, UserAddress.class);
+            saved.setId(100L);
+            return saved;
+        });
+
+        UserAddressVm result = userAddressService.createAddress(postVm);
+
+        assertThat(result.id()).isEqualTo(100L);
+        assertThat(result.addressGetVm()).isEqualTo(addressVm);
+        assertThat(result.isActive()).isTrue();
+    }
+
+    @Test
+    void createAddress_nonFirstAddress_setsActiveFalse() {
+        setUpSecurityContext("user-1");
+
+        when(userAddressRepository.findAllByUserId("user-1"))
+            .thenReturn(List.of(UserAddress.builder().id(1L).userId("user-1").addressId(1L).isActive(true).build()));
+
+        AddressPostVm postVm = buildAddressPostVm();
+        AddressVm addressVm = buildAddressVm(7L);
+        when(locationService.createAddress(postVm)).thenReturn(addressVm);
+
+        when(userAddressRepository.save(any(UserAddress.class))).thenAnswer(invocation -> {
+            UserAddress saved = invocation.getArgument(0, UserAddress.class);
+            saved.setId(200L);
+            return saved;
+        });
+
+        UserAddressVm result = userAddressService.createAddress(postVm);
+
+        assertThat(result.id()).isEqualTo(200L);
+        assertThat(result.isActive()).isFalse();
+    }
+
+    @Test
+    void deleteAddress_notFound_throwsNotFound() {
+        setUpSecurityContext("user-1");
+
+        when(userAddressRepository.findOneByUserIdAndAddressId("user-1", 10L)).thenReturn(null);
+
+        NotFoundException thrown = assertThrows(NotFoundException.class,
+            () -> userAddressService.deleteAddress(10L));
+        assertThat(thrown.getMessage()).contains("User address not found");
+    }
+
+    @Test
+    void deleteAddress_existing_deletes() {
+        setUpSecurityContext("user-1");
+
+        UserAddress userAddress = UserAddress.builder()
+            .id(11L)
+            .userId("user-1")
+            .addressId(10L)
+            .isActive(true)
+            .build();
+
+        when(userAddressRepository.findOneByUserIdAndAddressId("user-1", 10L)).thenReturn(userAddress);
+
+        userAddressService.deleteAddress(10L);
+
+        verify(userAddressRepository).delete(userAddress);
+    }
+
+    @Test
+    void chooseDefaultAddress_updatesActiveFlags() {
+        setUpSecurityContext("user-1");
+
+        UserAddress first = UserAddress.builder().id(1L).userId("user-1").addressId(10L).isActive(true).build();
+        UserAddress second = UserAddress.builder().id(2L).userId("user-1").addressId(20L).isActive(false).build();
+
+        when(userAddressRepository.findAllByUserId("user-1")).thenReturn(List.of(first, second));
+
+        userAddressService.chooseDefaultAddress(20L);
+
+        ArgumentCaptor<List<UserAddress>> captor = ArgumentCaptor.forClass(List.class);
+        verify(userAddressRepository).saveAll(captor.capture());
+
+        List<UserAddress> saved = captor.getValue();
+        assertThat(saved).hasSize(2);
+        assertThat(saved.getFirst().getAddressId()).isEqualTo(10L);
+        assertThat(saved.getFirst().getIsActive()).isFalse();
+        assertThat(saved.get(1).getAddressId()).isEqualTo(20L);
+        assertThat(saved.get(1).getIsActive()).isTrue();
+    }
+
+    private AddressDetailVm buildAddressDetail(Long id) {
+        return new AddressDetailVm(
+            id,
+            "John Doe",
+            "+1234567890",
+            "123 Elm Street",
+            "Springfield",
+            "62701",
+            101L,
+            "Downtown",
+            201L,
+            "Illinois",
+            301L,
+            "United States"
+        );
+    }
+
+    private AddressPostVm buildAddressPostVm() {
+        return new AddressPostVm(
+            "Jane Smith",
+            "+1987654321",
+            "456 Oak Avenue",
+            "Metropolis",
+            "54321",
+            102L,
+            202L,
+            302L
+        );
+    }
+
+    private AddressVm buildAddressVm(Long id) {
+        return new AddressVm(
+            id,
+            "Alice Johnson",
+            "+1239874560",
+            "789 Pine Road",
+            "Gotham",
+            "10001",
+            103L,
+            203L,
+            303L
+        );
+    }
 }
