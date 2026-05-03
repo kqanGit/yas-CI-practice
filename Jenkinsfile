@@ -80,7 +80,7 @@ pipeline {
                     try {
                         if (env.GIT_PREVIOUS_SUCCESSFUL_COMMIT) {
                             changedFiles = sh(
-                                script: "git diff --name-only \${env.GIT_PREVIOUS_SUCCESSFUL_COMMIT} HEAD",
+                                script: "git diff --name-only ${env.GIT_PREVIOUS_SUCCESSFUL_COMMIT} HEAD",
                                 returnStdout: true
                             ).trim()
                         } else if (env.BRANCH_NAME != 'main' && env.BRANCH_NAME != 'master') {
