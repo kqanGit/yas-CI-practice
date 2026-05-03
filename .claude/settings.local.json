@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./mvnw test *)",
+      "Bash(./mvnw install *)",
+      "Bash(cmd.exe /c mvnw.cmd install -DskipTests -pl common-library,payment-paypal -am)",
+      "Read(//c/Program Files/**)",
+      "Bash(find /c -name \"mvn.cmd\")"
+    ]
+  }
+}
