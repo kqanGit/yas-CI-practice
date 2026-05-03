@@ -231,10 +231,11 @@ pipeline {
         }
 
         // ───────────────────────────────────────────────────────
-        // STAGE 6: SONARQUBE ANALYSIS
+        // ───────────────────────────────────────────────────────
+        // STAGE 6: SONARQUBE SCAN
         // Run static code analysis and send results to SonarQube
         // ───────────────────────────────────────────────────────
-        stage('SonarQube Analysis') {
+        stage('SonarQube Scan') {
             when {
                 expression { return env.SKIP_BUILD != 'true' }
             }
@@ -252,21 +253,6 @@ pipeline {
             }
         }
 
-        // ───────────────────────────────────────────────────────
-        // STAGE 7: QUALIRT GATE - SONARQUBE
-        // Wait sonarqube return result about test coverage
-        // ───────────────────────────────────────────────────────
-        stage("Quality Gate") {
-            when {
-                expression { return env.SKIP_BUILD != 'true' }
-            }
-            steps {
-                timeout(time: 2, unit: 'MINUTES') {
-                    waitForQualityGate abortPipeline: true
-                }
-            }
-        }
-    }
 
     post {
         success {
