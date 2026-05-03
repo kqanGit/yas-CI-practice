@@ -47,7 +47,7 @@ class OrderVmTest {
                 .couponCode("CODE123")
                 .orderStatus(OrderStatus.PENDING)
                 .deliveryFee(BigDecimal.valueOf(5))
-                .deliveryMethod(DeliveryMethod.HOME_DELIVERY)
+            .deliveryMethod(DeliveryMethod.YAS_EXPRESS)
                 .deliveryStatus(DeliveryStatus.PREPARING)
                 .paymentStatus(PaymentStatus.PENDING)
                 .checkoutId("chk-1")

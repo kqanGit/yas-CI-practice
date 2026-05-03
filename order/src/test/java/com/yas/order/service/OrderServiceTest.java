@@ -48,7 +48,7 @@ class OrderServiceTest {
 
     @Test
     void getLatestOrders_countZero_returnsEmpty() {
-        List<com.yas.order.model.Order> res = orderService.getLatestOrders(0);
+        List<com.yas.order.viewmodel.order.OrderBriefVm> res = orderService.getLatestOrders(0);
         assertTrue(res.isEmpty());
     }
 

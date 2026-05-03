@@ -18,15 +18,15 @@ class OrderBriefVmTest {
     void fromModel_mapsFields() {
         OrderAddress bill = OrderAddress.builder().id(2L).contactName("Bill").build();
         Order order = Order.builder()
-                .id(11L)
-                .email("a@b.c")
-                .billingAddressId(bill)
-                .totalPrice(BigDecimal.valueOf(100))
-                .orderStatus(OrderStatus.PAID)
-                .deliveryMethod(DeliveryMethod.PICKUP)
-                .deliveryStatus(DeliveryStatus.READY)
-                .paymentStatus(PaymentStatus.COMPLETED)
-                .build();
+            .id(11L)
+            .email("a@b.c")
+            .billingAddressId(bill)
+            .totalPrice(BigDecimal.valueOf(100))
+            .orderStatus(OrderStatus.PAID)
+            .deliveryMethod(DeliveryMethod.YAS_EXPRESS)
+            .deliveryStatus(DeliveryStatus.DELIVERED)
+            .paymentStatus(PaymentStatus.COMPLETED)
+            .build();
 
         OrderBriefVm vm = OrderBriefVm.fromModel(order);
 
