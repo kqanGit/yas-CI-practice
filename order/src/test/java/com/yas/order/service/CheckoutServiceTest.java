@@ -1,5 +1,118 @@
 package com.yas.order.service;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
+import com.yas.commonlibrary.exception.NotFoundException;
+import com.yas.commonlibrary.exception.ForbiddenException;
+import com.yas.commonlibrary.utils.AuthenticationUtils;
+import com.yas.order.model.Checkout;
+import com.yas.order.model.CheckoutItem;
+import com.yas.order.viewmodel.checkout.CheckoutItemPostVm;
+import com.yas.order.viewmodel.checkout.CheckoutPostVm;
+import com.yas.order.viewmodel.product.ProductCheckoutListVm;
+import com.yas.order.viewmodel.checkout.CheckoutVm;
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.MockedStatic;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+@ExtendWith(MockitoExtension.class)
+class CheckoutServiceTest {
+
+    @Mock
+    CheckoutRepository checkoutRepository;
+
+    @Mock
+    OrderService orderService;
+
+    @Mock
+    ProductService productService;
+
+    @Mock
+    CheckoutMapper checkoutMapper;
+
+    @InjectMocks
+    CheckoutService checkoutService;
+
+    @Test
+    void createCheckout_success_calculatesTotalAmount() {
+        CheckoutItemPostVm itemVm = new CheckoutItemPostVm(1L, "d", 2);
+        CheckoutPostVm postVm = new CheckoutPostVm("e", "n", "p", "s", "pm", "addr", List.of(itemVm));
+
+        Checkout checkoutModel = Checkout.builder().id("c1").build();
+        when(checkoutMapper.toModel(postVm)).thenReturn(checkoutModel);
+
+        CheckoutItem checkoutItem = CheckoutItem.builder().productId(1L).quantity(2).build();
+        when(checkoutMapper.toModel(itemVm)).thenReturn(checkoutItem);
+
+        ProductCheckoutListVm product = ProductCheckoutListVm.builder().id(1L).name("P").price(10.0).build();
+        when(productService.getProductInfomation(any(), anyInt(), anyInt())).thenReturn(Map.of(1L, product));
+
+        when(checkoutRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        when(checkoutMapper.toVm(any())).thenAnswer(invocation -> {
+            Checkout c = invocation.getArgument(0);
+            return CheckoutVm.builder().id(c.getId()).totalAmount(c.getTotalAmount()).build();
+        });
+
+        try (MockedStatic<AuthenticationUtils> auth = mockStatic(AuthenticationUtils.class)) {
+            auth.when(AuthenticationUtils::extractUserId).thenReturn("user-x");
+
+            CheckoutVm result = checkoutService.createCheckout(postVm);
+
+            assertNotNull(result);
+            assertEquals(BigDecimal.valueOf(20.0), result.totalAmount());
+            verify(checkoutRepository).save(any());
+        }
+    }
+
+    @Test
+    void createCheckout_missingProduct_throwsNotFound() {
+        CheckoutItemPostVm itemVm = new CheckoutItemPostVm(2L, "d", 1);
+        CheckoutPostVm postVm = new CheckoutPostVm("e", "n", "p", "s", "pm", "addr", List.of(itemVm));
+
+        when(checkoutMapper.toModel(postVm)).thenReturn(Checkout.builder().id("c2").build());
+        when(checkoutMapper.toModel(itemVm)).thenReturn(CheckoutItem.builder().productId(2L).quantity(1).build());
+        when(productService.getProductInfomation(any(), anyInt(), anyInt())).thenReturn(Map.of());
+
+        try (MockedStatic<AuthenticationUtils> auth = mockStatic(AuthenticationUtils.class)) {
+            auth.when(AuthenticationUtils::extractUserId).thenReturn("u");
+            assertThrows(NotFoundException.class, () -> checkoutService.createCheckout(postVm));
+        }
+    }
+
+    @Test
+    void getCheckoutPendingStateWithItemsById_notOwner_throwsForbidden() {
+        Checkout checkout = Checkout.builder().id("cid").customerId("owner").checkoutState(null).build();
+        when(checkoutRepository.findByIdAndCheckoutState("cid", null)).thenReturn(java.util.Optional.of(checkout));
+
+        try (MockedStatic<AuthenticationUtils> auth = mockStatic(AuthenticationUtils.class)) {
+            auth.when(AuthenticationUtils::extractUserId).thenReturn("someoneElse");
+            assertThrows(ForbiddenException.class, () -> checkoutService.getCheckoutPendingStateWithItemsById("cid"));
+        }
+    }
+
+    @Test
+    void updateCheckoutPaymentMethod_setsAndSaves() {
+        Checkout checkout = Checkout.builder().id("cid2").paymentMethodId(null).build();
+        when(checkoutRepository.findById("cid2")).thenReturn(java.util.Optional.of(checkout));
+
+        checkoutService.updateCheckoutPaymentMethod("cid2", new com.yas.order.viewmodel.checkout.CheckoutPaymentMethodPutVm("pm-1"));
+
+        assertEquals("pm-1", checkout.getPaymentMethodId());
+        verify(checkoutRepository).save(checkout);
+    }
+}
+package com.yas.order.service;
+
 import static com.yas.order.utils.SecurityContextUtils.setSubjectUpSecurityContext;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
