@@ -94,6 +94,7 @@ class PaymentTest {
     PaymentStatus paymentStatus = PaymentStatus.COMPLETED;
     String gatewayTransactionId = "txn-999";
     String failureMessage = "Payment failed";
+    String paymentProviderCheckoutId = "provider-123";
 
     // When
     Payment payment = new Payment(
@@ -104,7 +105,8 @@ class PaymentTest {
         paymentMethod,
         paymentStatus,
         gatewayTransactionId,
-        failureMessage
+        failureMessage,
+        paymentProviderCheckoutId
     );
 
     // Then - All args constructor does not set id, so id should be null
