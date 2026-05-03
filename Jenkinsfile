@@ -86,7 +86,7 @@ pipeline {
                         } else if (env.BRANCH_NAME != 'main' && env.BRANCH_NAME != 'master') {
                             sh 'git fetch origin main || true'
                             changedFiles = sh(
-                                script: "git diff --name-only origin/main...HEAD",
+                                script: "git diff --name-only FETCH_HEAD...HEAD",
                                 returnStdout: true
                             ).trim()
                         } else {
