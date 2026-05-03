@@ -124,4 +124,27 @@ class PaymentServiceTest {
         assertEquals(capturedPayment.getFailureMessage(), responseVm.failureMessage());
     }
 
+    @Test
+    void initPayment_withInvalidProvider_shouldThrowIllegalArgument() {
+        InitPaymentRequestVm request = InitPaymentRequestVm.builder()
+                .paymentMethod("UNKNOWN_PROVIDER").totalPrice(BigDecimal.TEN).checkoutId("123").build();
+
+        var exception = org.junit.jupiter.api.Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> paymentService.initPayment(request)
+        );
+        assertEquals("No payment handler found for provider: UNKNOWN_PROVIDER", exception.getMessage());
+    }
+
+    @Test
+    void capturePayment_withInvalidProvider_shouldThrowIllegalArgument() {
+        CapturePaymentRequestVm request = CapturePaymentRequestVm.builder()
+                .paymentMethod("INVALID").token("token").build();
+
+        org.junit.jupiter.api.Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> paymentService.capturePayment(request)
+        );
+    }
+
 }
