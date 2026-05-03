@@ -151,6 +151,9 @@ pipeline {
                 expression { return env.SKIP_BUILD != 'true' }
             }
             steps {
+                echo ">>> Cleaning old workspace artifacts..."
+                sh 'mvn clean' // Clean ALL target/ directories to prevent stale coverage/test reports
+                
                 echo ">>> Building: ${env.SERVICES_TO_BUILD}"
                 sh 'java -version'
                 sh 'mvn -v'
