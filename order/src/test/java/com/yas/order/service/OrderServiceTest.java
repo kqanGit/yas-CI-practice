@@ -54,7 +54,8 @@ class OrderServiceTest {
 
     @Test
     void getLatestOrders_withData_returnsMappedList() {
-        Order o = Order.builder().id(7L).totalPrice(BigDecimal.TEN).build();
+        Order o = Order.builder().id(7L).totalPrice(BigDecimal.TEN)
+                .billingAddressId(new com.yas.order.model.OrderAddress()).build();
         when(orderRepository.getLatestOrders(any(Pageable.class))).thenReturn(List.of(o));
 
         var list = orderService.getLatestOrders(1);
