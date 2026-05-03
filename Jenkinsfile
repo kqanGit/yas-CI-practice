@@ -78,13 +78,26 @@ pipeline {
                     // Get list of changed files compared to previous commit
                     def changedFiles = ''
                     try {
-                        changedFiles = sh(
-                            script: "git diff --name-only HEAD~1 HEAD",
-                            returnStdout: true
-                        ).trim()
+                        if (env.GIT_PREVIOUS_SUCCESSFUL_COMMIT) {
+                            changedFiles = sh(
+                                script: "git diff --name-only \${env.GIT_PREVIOUS_SUCCESSFUL_COMMIT} HEAD",
+                                returnStdout: true
+                            ).trim()
+                        } else if (env.BRANCH_NAME != 'main' && env.BRANCH_NAME != 'master') {
+                            sh 'git fetch origin main || true'
+                            changedFiles = sh(
+                                script: "git diff --name-only origin/main...HEAD",
+                                returnStdout: true
+                            ).trim()
+                        } else {
+                            changedFiles = sh(
+                                script: "git diff --name-only HEAD~1 HEAD",
+                                returnStdout: true
+                            ).trim()
+                        }
                     } catch (Exception e) {
                         // First commit or shallow clone — list all files
-                        echo "First commit or shallow clone, listing all files"
+                        echo "Failed to diff, listing all files as fallback"
                         changedFiles = sh(
                             script: "git ls-files",
                             returnStdout: true
@@ -156,6 +169,8 @@ pipeline {
             steps {
                 echo ">>> Testing: ${env.SERVICES_TO_BUILD}"
                 sh "mvn verify -pl ${env.SERVICES_TO_BUILD} -am -Dmaven.install.skip=true -Dmaven.test.failure.ignore=true"
+                echo ">>> Generating JaCoCo coverage report..."
+                sh "mvn jacoco:report -pl ${env.SERVICES_TO_BUILD} -am"
             } // comment to run test to show coverage
             // steps {
             //     script {
@@ -239,9 +254,6 @@ pipeline {
                 expression { return env.SKIP_BUILD != 'true' }
             }
             steps {
-                // Generate JaCoCo XML reports from .exec files (needed for SonarQube)
-                sh "mvn jacoco:report -pl ${env.SERVICES_TO_BUILD} -am"
-
                 withSonarQubeEnv('sonarqube') {
                     sh """mvn sonar:sonar \
                     -pl ${env.SERVICES_TO_BUILD} -am \
