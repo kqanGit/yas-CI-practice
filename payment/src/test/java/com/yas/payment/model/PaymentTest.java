@@ -87,6 +87,7 @@ class PaymentTest {
   void allArgsConstructor_shouldCreatePaymentWithAllParameters() {
     // Given
     Long orderId = 2L;
+    Long id = 1L;
     String checkoutId = "checkout-789";
     BigDecimal amount = new BigDecimal("250.50");
     BigDecimal paymentFee = new BigDecimal("10.00");
@@ -99,6 +100,7 @@ class PaymentTest {
     // When
     Payment payment = new Payment(
         orderId,
+        id,
         checkoutId,
         amount,
         paymentFee,
@@ -109,8 +111,8 @@ class PaymentTest {
         paymentProviderCheckoutId
     );
 
-    // Then - All args constructor does not set id, so id should be null
-    assertNull(payment.getId());
+    // Then
+    assertEquals(id, payment.getId());
     assertEquals(orderId, payment.getOrderId());
     assertEquals(checkoutId, payment.getCheckoutId());
     assertEquals(amount, payment.getAmount());
