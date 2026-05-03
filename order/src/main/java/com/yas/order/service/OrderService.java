@@ -291,6 +291,13 @@ public class OrderService {
     public byte[] exportCsv(OrderRequest orderRequest) throws IOException {
         ZonedDateTime createdFrom = orderRequest.getCreatedFrom();
         ZonedDateTime createdTo = orderRequest.getCreatedTo();
+        // tolerate null date filters: use sensible defaults so export still works
+        if (Objects.isNull(createdFrom)) {
+            createdFrom = ZonedDateTime.now().minusYears(100);
+        }
+        if (Objects.isNull(createdTo)) {
+            createdTo = ZonedDateTime.now();
+        }
         String productName = orderRequest.getProductName();
         List<OrderStatus> orderStatus = orderRequest.getOrderStatus();
         String billingCountry = orderRequest.getBillingCountry();
@@ -299,21 +306,34 @@ public class OrderService {
         int pageNo = orderRequest.getPageNo();
         int pageSize = orderRequest.getPageSize();
 
-        OrderListVm orderListVm = getAllOrder(
-            Pair.of(createdFrom, createdTo),
-            productName,
-            orderStatus,
-            Pair.of(billingCountry, billingPhoneNumber),
+        if (log.isDebugEnabled()) {
+            log.debug("exportCsv: createdFrom={}, createdTo={}", createdFrom, createdTo);
+        }
+        // inline getAllOrder logic to avoid Pair.of null-safety issues in tests
+        Sort sort = Sort.by(Sort.Direction.DESC, Constants.Column.CREATE_ON_COLUMN);
+        Pageable pageable = PageRequest.of(pageNo, pageSize, sort);
+
+        List<OrderStatus> allOrderStatus = Arrays.asList(OrderStatus.values());
+
+        Specification<Order> spec = OrderSpecification.findOrderByWithMulCriteria(
+            orderStatus == null || orderStatus.isEmpty() ? allOrderStatus : orderStatus,
+            billingPhoneNumber,
+            billingCountry,
             email,
-            Pair.of(pageNo, pageSize)
+            productName,
+            createdFrom,
+            createdTo
         );
 
-        if (Objects.isNull(orderListVm.orderList())) {
+        Page<Order> orderPage = orderRepository.findAll(spec, pageable);
+        if (orderPage.isEmpty()) {
             return CsvExporter.exportToCsv(List.of(), OrderItemCsv.class);
         }
 
-        List<BaseCsv> orders = orderListVm.orderList().stream().map(orderMapper::toCsv).collect(
-            Collectors.toUnmodifiableList());
+        List<BaseCsv> orders = orderPage.getContent().stream()
+            .map(OrderBriefVm::fromModel)
+            .map(orderMapper::toCsv)
+            .collect(Collectors.toUnmodifiableList());
         return CsvExporter.exportToCsv(orders, OrderItemCsv.class);
     }
 }
