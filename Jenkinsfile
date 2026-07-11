@@ -229,14 +229,17 @@ pipeline {
                 mvn -v
                 '''
 
+                // Sử dụng chính xác ID 'sonarqube_connection' đang có trong Jenkins của bạn
                 withCredentials([string(credentialsId: 'sonarqube_connection', variable: 'SONAR_TOKEN')]) {
-                    withSonarQubeEnv('SonarQube') { 
+                    
+                    // THÊM BỌC NGOÀI NÀY: Kết nối và đồng bộ với Jenkins SonarQube Plugin
+                    withSonarQubeEnv('sonarqube') { 
                         sh '''
-                        # Bước 1: Biên dịch nhanh toàn bộ các module để sinh file target/classes (.class)
-                        # Bước này bắt buộc phải có để SonarQube quét các module không thay đổi mà không bị crash
+                        # 1. Biên dịch toàn bộ các module (bỏ qua test) để sinh file target/classes (.class)
+                        # Bước này giúp các module bị SKIP ở stage trước vẫn có binary cho SonarQube quét
                         mvn clean compile -DskipTests
 
-                        # Bước 2: Thực hiện quét và đẩy báo cáo lên SonarQube
+                        # 2. Thực hiện chạy phân tích tĩnh và đẩy kết quả lên hệ thống
                         mvn sonar:sonar \
                         -Dsonar.projectKey=yas-project \
                         -Dsonar.host.url=http://20.6.106.112:9000 \
@@ -244,6 +247,7 @@ pipeline {
                         -Dsonar.coverage.jacoco.xmlReportPaths=**/target/site/jacoco/jacoco.xml
                         '''
                     }
+                    
                 }
             }
         }
