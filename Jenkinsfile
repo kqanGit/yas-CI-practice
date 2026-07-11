@@ -218,7 +218,7 @@ pipeline {
             }
         }
 
-        // ───────────────────────────────────────────────────────
+       // ───────────────────────────────────────────────────────
         // STAGE 6: SONARQUBE ANALYSIS
         // Run static code analysis and send results to SonarQube
         // ───────────────────────────────────────────────────────
@@ -232,23 +232,26 @@ pipeline {
                 mvn -v
                 '''
 
-                withSonarQubeEnv('sonarqube') {
+                // Sử dụng chính xác ID 'sonarqube_connection' đang có trong Jenkins của bạn
+                withCredentials([string(credentialsId: 'sonarqube_connection', variable: 'SONAR_TOKEN')]) {
                     sh '''
-                    mvn clean verify sonar:sonar \
+                    mvn sonar:sonar \
                     -Dsonar.projectKey=yas-project \
-                    -DskipTests
+                    -Dsonar.host.url=http://20.6.106.112:9000 \
+                    -Dsonar.token=$SONAR_TOKEN \
+                    -Dsonar.coverage.jacoco.xmlReportPaths=**/target/site/jacoco/jacoco.xml
                     '''
                 }
             }
         }
 
         // ───────────────────────────────────────────────────────
-        // STAGE 7: QUALIRT GATE - SONARQUBE
+        // STAGE 7: QUALITY GATE - SONARQUBE
         // Wait sonarqube return result about test coverage
         // ───────────────────────────────────────────────────────
         stage("Quality Gate") {
             steps {
-                timeout(time: 2, unit: 'MINUTES') {
+                timeout(time: 5, unit: 'MINUTES') {
                     waitForQualityGate abortPipeline: true
                 }
             }
