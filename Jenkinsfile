@@ -220,27 +220,30 @@ pipeline {
 
        // ───────────────────────────────────────────────────────
         // STAGE 6: SONARQUBE ANALYSIS
-        // Run static code analysis and send results to SonarQube
         // ───────────────────────────────────────────────────────
         stage('SonarQube Analysis') {
             steps {
                 sh '''
                 echo USER=$(whoami)
                 echo JAVA_HOME=$JAVA_HOME
-                which java
-                java -version
                 mvn -v
                 '''
 
-                // Sử dụng chính xác ID 'sonarqube_connection' đang có trong Jenkins của bạn
+                // Dùng chính xác credential id để lấy Token
                 withCredentials([string(credentialsId: 'sonarqube_connection', variable: 'SONAR_TOKEN')]) {
-                    sh '''
-                    mvn sonar:sonar \
-                    -Dsonar.projectKey=yas-project \
-                    -Dsonar.host.url=http://20.6.106.112:9000 \
-                    -Dsonar.token=$SONAR_TOKEN \
-                    -Dsonar.coverage.jacoco.xmlReportPaths=**/target/site/jacoco/jacoco.xml
-                    '''
+                    
+                    // THÊM BỌC NGOÀI NÀY: Điền tên SonarQube Server cấu hình trong mục "Manage Jenkins -> System"
+                    // Thường mặc định đặt tên là 'SonarQube' hoặc 'sonar'
+                    withSonarQubeEnv('sonarqube') { 
+                        sh '''
+                        mvn sonar:sonar \
+                        -Dsonar.projectKey=yas-project \
+                        -Dsonar.host.url=http://20.6.106.112:9000 \
+                        -Dsonar.token=$SONAR_TOKEN \
+                        -Dsonar.coverage.jacoco.xmlReportPaths=**/target/site/jacoco/jacoco.xml
+                        '''
+                    }
+                    
                 }
             }
         }
