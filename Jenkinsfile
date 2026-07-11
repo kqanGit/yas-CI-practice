@@ -218,7 +218,7 @@ pipeline {
             }
         }
 
-       // ───────────────────────────────────────────────────────
+        // ───────────────────────────────────────────────────────
         // STAGE 6: SONARQUBE ANALYSIS
         // ───────────────────────────────────────────────────────
         stage('SonarQube Analysis') {
@@ -229,13 +229,14 @@ pipeline {
                 mvn -v
                 '''
 
-                // Dùng chính xác credential id để lấy Token
                 withCredentials([string(credentialsId: 'sonarqube_connection', variable: 'SONAR_TOKEN')]) {
-                    
-                    // THÊM BỌC NGOÀI NÀY: Điền tên SonarQube Server cấu hình trong mục "Manage Jenkins -> System"
-                    // Thường mặc định đặt tên là 'SonarQube' hoặc 'sonar'
-                    withSonarQubeEnv('sonarqube') { 
+                    withSonarQubeEnv('SonarQube') { 
                         sh '''
+                        # Bước 1: Biên dịch nhanh toàn bộ các module để sinh file target/classes (.class)
+                        # Bước này bắt buộc phải có để SonarQube quét các module không thay đổi mà không bị crash
+                        mvn clean compile -DskipTests
+
+                        # Bước 2: Thực hiện quét và đẩy báo cáo lên SonarQube
                         mvn sonar:sonar \
                         -Dsonar.projectKey=yas-project \
                         -Dsonar.host.url=http://20.6.106.112:9000 \
@@ -243,7 +244,6 @@ pipeline {
                         -Dsonar.coverage.jacoco.xmlReportPaths=**/target/site/jacoco/jacoco.xml
                         '''
                     }
-                    
                 }
             }
         }
