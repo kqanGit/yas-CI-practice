@@ -50,4 +50,10 @@ class AbstractCircuitBreakFallbackHandlerTest {
 
         assertSame(ex, thrown);
     }
+
+    @Test
+    void testTriggerJenkins() {
+        TestHandler handler = new TestHandler();
+        org.junit.jupiter.api.Assertions.assertNotNull(handler);
+    }
 }
