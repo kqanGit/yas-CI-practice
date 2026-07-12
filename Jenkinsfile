@@ -202,7 +202,67 @@ pipeline {
             }
         }
 
-       // ───────────────────────────────────────────────────────
+        // ───────────────────────────────────────────────────────
+        // STAGE 6: SONARQUBE ANALYSIS
+        // (ĐƯỢC ĐƯA LÊN TRƯỚC SNYK SCAN)
+        // ───────────────────────────────────────────────────────
+        stage('SonarQube Analysis') {
+            steps {
+                sh '''
+                echo USER=$(whoami)
+                echo JAVA_HOME=$JAVA_HOME
+                mvn -v
+                '''
+
+                withCredentials([string(credentialsId: 'sonarqube_connection', variable: 'SONAR_TOKEN')]) {
+                    withSonarQubeEnv('sonarqube') {
+                        sh '''
+                        # KHÔNG DÙNG clean. Chỉ compile để đảm bảo các class đầy đủ
+                        mvn compile -DskipTests 
+
+                        # Thực hiện phân tích tĩnh và chỉ định chính xác tính năng quét báo cáo XML của JaCoCo
+                        mvn sonar:sonar \
+                        -Dsonar.projectKey=yas-project \
+                        -Dsonar.host.url=http://70.153.136.35:9000 \
+                        -Dsonar.token=$SONAR_TOKEN \
+                        -Dsonar.java.binaries=**/target/classes \
+                        -Dsonar.coverage.jacoco.xmlReportPaths=**/target/site/jacoco/jacoco.xml,**/target/site/jacoco-ut/jacoco.xml
+                        '''
+                    }
+                }
+            }
+        }
+
+        // ───────────────────────────────────────────────────────
+        // STAGE 8: SNYK SCAN (ĐƯA XUỐNG DƯỚI)
+        // ───────────────────────────────────────────────────────
+        stage('Snyk Scan') {
+            steps {
+                withCredentials([string(credentialsId: 'snyk_connection', variable: 'SNYK_TOKEN')]) {
+                    sh '''
+                    snyk auth $SNYK_TOKEN
+                    echo ">>> Running Snyk vulnerability scan..."
+                    snyk test || true
+                    echo ">>> Pushing Snyk snapshot to Web Dashboard..."
+                    snyk monitor || true
+                    '''
+                }
+            }
+        }
+
+        // ───────────────────────────────────────────────────────
+        // STAGE 7: QUALITY GATE - SONARQUBE
+        // Wait sonarqube return result about test coverage
+        // ───────────────────────────────────────────────────────
+        // stage("Quality Gate") {
+        //     steps {
+        //         timeout(time: 5, unit: 'MINUTES') {
+        //             waitForQualityGate abortPipeline: true
+        //         }
+        //     }
+        // }
+
+        // ───────────────────────────────────────────────────────
         // STAGE 8: SNYK SCAN
         // Scan dependencies to secure system if dependencies is not safe
         // ───────────────────────────────────────────────────────
@@ -225,51 +285,6 @@ pipeline {
                 }
             }
         }
-
-        // ───────────────────────────────────────────────────────
-        // STAGE 6: SONARQUBE ANALYSIS
-        // ───────────────────────────────────────────────────────
-        stage('SonarQube Analysis') {
-            steps {
-                sh '''
-                echo USER=$(whoami)
-                echo JAVA_HOME=$JAVA_HOME
-                mvn -v
-                '''
-
-                // Sử dụng chính xác ID 'sonarqube_connection' đang có trong Jenkins của bạn
-                withCredentials([string(credentialsId: 'sonarqube_connection', variable: 'SONAR_TOKEN')]) {
-                    
-                    // THÊM BỌC NGOÀI NÀY: Kết nối và đồng bộ với Jenkins SonarQube Plugin
-                    withSonarQubeEnv('sonarqube') {
-                        sh '''
-                        # KHÔNG DÙNG clean để tránh xóa mất file jacoco.xml đã tạo ở stage Test
-                        mvn compile -DskipTests 
-
-                        # Thực hiện phân tích tĩnh dựa trên kết quả test sẵn có
-                        mvn sonar:sonar \
-                        -Dsonar.projectKey=yas-project \
-                        -Dsonar.host.url=http://70.153.136.35:9000 \
-                        -Dsonar.token=$SONAR_TOKEN \
-                        -Dsonar.coverage.jacoco.xmlReportPaths=**/target/site/jacoco/jacoco.xml
-                        '''
-                    }
-                    
-                }
-            }
-        }
-
-        // ───────────────────────────────────────────────────────
-        // STAGE 7: QUALITY GATE - SONARQUBE
-        // Wait sonarqube return result about test coverage
-        // ───────────────────────────────────────────────────────
-        // stage("Quality Gate") {
-        //     steps {
-        //         timeout(time: 5, unit: 'MINUTES') {
-        //             waitForQualityGate abortPipeline: true
-        //         }
-        //     }
-        // }
     }
 
     post {
