@@ -16,6 +16,6 @@ class ConstantsTest {
 
     @Test
     void testCartDummyForJenkins() {
-        assertEquals(2, 1 + 1);
+        assertEquals(4, 2 + 2);
     }
 }
