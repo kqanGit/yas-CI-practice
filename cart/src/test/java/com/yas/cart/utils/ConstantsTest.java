@@ -13,4 +13,9 @@ class ConstantsTest {
         assertEquals("ADD_CART_ITEM_FAILED", Constants.ErrorCode.ADD_CART_ITEM_FAILED);
         assertNotNull(Constants.ErrorCode.DUPLICATED_CART_ITEMS_TO_DELETE);
     }
+
+    @Test
+    void testCartDummyForJenkins() {
+        assertEquals(2, 1 + 1);
+    }
 }
