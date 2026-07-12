@@ -222,29 +222,36 @@ pipeline {
             }
         }
 
-       // ───────────────────────────────────────────────────────
+        // ───────────────────────────────────────────────────────
         // STAGE 6: SONARQUBE ANALYSIS
-        // Run static code analysis and send results to SonarQube
         // ───────────────────────────────────────────────────────
         stage('SonarQube Analysis') {
             steps {
                 sh '''
                 echo USER=$(whoami)
                 echo JAVA_HOME=$JAVA_HOME
-                which java
-                java -version
                 mvn -v
                 '''
 
                 // Sử dụng chính xác ID 'sonarqube_connection' đang có trong Jenkins của bạn
                 withCredentials([string(credentialsId: 'sonarqube_connection', variable: 'SONAR_TOKEN')]) {
-                    sh '''
-                    mvn sonar:sonar \
-                    -Dsonar.projectKey=yas-project \
-                    -Dsonar.host.url=http://20.6.106.112:9000 \
-                    -Dsonar.token=$SONAR_TOKEN \
-                    -Dsonar.coverage.jacoco.xmlReportPaths=**/target/site/jacoco/jacoco.xml
-                    '''
+                    
+                    // THÊM BỌC NGOÀI NÀY: Kết nối và đồng bộ với Jenkins SonarQube Plugin
+                    withSonarQubeEnv('sonarqube') { 
+                        sh '''
+                        # 1. Biên dịch toàn bộ các module (bỏ qua test) để sinh file target/classes (.class)
+                        # Bước này giúp các module bị SKIP ở stage trước vẫn có binary cho SonarQube quét
+                        mvn clean compile -DskipTests
+
+                        # 2. Thực hiện chạy phân tích tĩnh và đẩy kết quả lên hệ thống
+                        mvn sonar:sonar \
+                        -Dsonar.projectKey=yas-project \
+                        -Dsonar.host.url=http://70.153.136.35:9000 \
+                        -Dsonar.token=$SONAR_TOKEN \
+                        -Dsonar.coverage.jacoco.xmlReportPaths=**/target/site/jacoco/jacoco.xml
+                        '''
+                    }
+                    
                 }
             }
         }
