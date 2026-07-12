@@ -1,12 +1,16 @@
 pipeline {
     agent any
 
+    tools {
+        jdk 'JDK25_SDKMAN'
+    }
+
     environment {
         // If Java is not in default PATH, uncomment and adjust:
         // JAVA_HOME = '/usr/lib/jvm/java-21-openjdk-amd64'
 
-        JAVA_HOME = '/var/jenkins_home/.sdkman/candidates/java/25.0.2-tem'
-        PATH = "${JAVA_HOME}/bin:${env.PATH}"
+        // JAVA_HOME = '/var/jenkins_home/.sdkman/candidates/java/25.0.2-tem'
+        // PATH = "${JAVA_HOME}/bin:${env.PATH}"
 
         // All Java services in the monorepo
         JAVA_SERVICES = 'cart,customer,delivery,inventory,location,media,order,payment,payment-paypal,product,promotion,rating,recommendation,sampledata,search,storefront-bff,backoffice-bff,tax,webhook'
