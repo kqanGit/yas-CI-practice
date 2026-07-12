@@ -1260,12 +1260,19 @@ class ProductServiceTest {
         product.setName("Latest Product");
         product.setSlug("latest-product");
         product.setPrice(100.0);
+        product.setAllowedToOrder(true);
+        product.setPublished(true);
 
         when(productRepository.getLatestProducts(any(Pageable.class))).thenReturn(List.of(product));
         var result = productService.getLatestProducts(1);
         assertEquals(1, result.size());
         assertEquals(701L, result.get(0).id());
         assertEquals("Latest Product", result.get(0).name());
+    }
+
+    @Test
+    void testJenkinsTriggerAndPass() {
+        assertTrue(true);
     }
 
 }
