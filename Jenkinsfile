@@ -242,7 +242,7 @@ pipeline {
                         # 2. Thực hiện chạy phân tích tĩnh và đẩy kết quả lên hệ thống
                         mvn sonar:sonar \
                         -Dsonar.projectKey=yas-project \
-                        -Dsonar.host.url=http://20.6.106.112:9000 \
+                        -Dsonar.host.url=http://70.153.136.35:9000 \
                         -Dsonar.token=$SONAR_TOKEN \
                         -Dsonar.coverage.jacoco.xmlReportPaths=**/target/site/jacoco/jacoco.xml
                         '''
