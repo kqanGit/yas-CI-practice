@@ -6,6 +6,12 @@ pipeline {
     }
 
     environment {
+        // If Java is not in default PATH, uncomment and adjust:
+        // JAVA_HOME = '/usr/lib/jvm/java-21-openjdk-amd64'
+
+        // JAVA_HOME = '/var/jenkins_home/.sdkman/candidates/java/25.0.2-tem'
+        // PATH = "${JAVA_HOME}/bin:${env.PATH}"
+
         // All Java services in the monorepo
         JAVA_SERVICES = 'cart,customer,delivery,inventory,location,media,order,payment,payment-paypal,product,promotion,rating,recommendation,sampledata,search,storefront-bff,backoffice-bff,tax,webhook'
     }
@@ -76,26 +82,13 @@ pipeline {
                     // Get list of changed files compared to previous commit
                     def changedFiles = ''
                     try {
-                        if (env.GIT_PREVIOUS_SUCCESSFUL_COMMIT) {
-                            changedFiles = sh(
-                                script: "git diff --name-only ${env.GIT_PREVIOUS_SUCCESSFUL_COMMIT} HEAD",
-                                returnStdout: true
-                            ).trim()
-                        } else if (env.BRANCH_NAME != 'main' && env.BRANCH_NAME != 'master') {
-                            sh 'git fetch origin main || true'
-                            changedFiles = sh(
-                                script: "git diff --name-only FETCH_HEAD...HEAD",
-                                returnStdout: true
-                            ).trim()
-                        } else {
-                            changedFiles = sh(
-                                script: "git diff --name-only HEAD~1 HEAD",
-                                returnStdout: true
-                            ).trim()
-                        }
+                        changedFiles = sh(
+                            script: "git diff --name-only HEAD~1 HEAD",
+                            returnStdout: true
+                        ).trim()
                     } catch (Exception e) {
                         // First commit or shallow clone — list all files
-                        echo "Failed to diff, listing all files as fallback"
+                        echo "First commit or shallow clone, listing all files"
                         changedFiles = sh(
                             script: "git ls-files",
                             returnStdout: true
@@ -129,7 +122,7 @@ pipeline {
                     if (servicesToBuild.isEmpty()) {
                         env.SERVICES_TO_BUILD = ''
                         env.SKIP_BUILD = 'true'
-                        echo ">>> No service changes detected. Skipping build/test/scan."
+                        echo ">>> No Java services changed. Pipeline will skip build/test."
                     } else {
                         // Maven uses comma-separated module list: -pl cart,media,order
                         env.SERVICES_TO_BUILD = servicesToBuild.join(',')
@@ -149,9 +142,6 @@ pipeline {
                 expression { return env.SKIP_BUILD != 'true' }
             }
             steps {
-                echo ">>> Cleaning old workspace artifacts..."
-                sh 'mvn clean' // Clean ALL target/ directories to prevent stale coverage/test reports
-                
                 echo ">>> Building: ${env.SERVICES_TO_BUILD}"
                 sh 'java -version'
                 sh 'mvn -v'
@@ -169,9 +159,7 @@ pipeline {
             }
             steps {
                 echo ">>> Testing: ${env.SERVICES_TO_BUILD}"
-                sh "mvn verify -pl ${env.SERVICES_TO_BUILD} -am -Dmaven.install.skip=true -Dmaven.test.failure.ignore=true"
-                echo ">>> Generating JaCoCo coverage report..."
-                sh "mvn jacoco:report -pl ${env.SERVICES_TO_BUILD} -am"
+                sh "mvn verify -pl ${env.SERVICES_TO_BUILD} -am -Dmaven.install.skip=true"
             } // comment to run test to show coverage
             // steps {
             //     script {
@@ -210,49 +198,75 @@ pipeline {
             }
         }
 
-
-
-        // ───────────────────────────────────────────────────────
+       // ───────────────────────────────────────────────────────
         // STAGE 8: SNYK SCAN
         // Scan dependencies to secure system if dependencies is not safe
         // ───────────────────────────────────────────────────────
         stage('Snyk Scan') {
-            when {
-                expression { return env.SKIP_BUILD != 'true' }
-            }
             steps {
                 withCredentials([string(credentialsId: 'snyk_connection', variable: 'SNYK_TOKEN')]) {
                     sh '''
                     snyk auth $SNYK_TOKEN
 
                     echo ">>> Running Snyk vulnerability scan..."
-
+                    
+                    # 1. Quét cục bộ và in log ra console của Jenkins
                     snyk test || true
+
+                    echo ">>> Pushing Snyk snapshot to Web Dashboard..."
+                    
+                    # 2. THÊM DÒNG NÀY: Đẩy toàn bộ kết quả lên Dashboard Snyk của tổ chức
+                    snyk monitor || true
                     '''
                 }
             }
         }
 
         // ───────────────────────────────────────────────────────
+        // STAGE 6: SONARQUBE ANALYSIS
         // ───────────────────────────────────────────────────────
-        // STAGE 6: SONARQUBE SCAN
-        // Run static code analysis and send results to SonarQube
-        // ───────────────────────────────────────────────────────
-        stage('SonarQube Scan') {
-            when {
-                expression { return env.SKIP_BUILD != 'true' }
-            }
+        stage('SonarQube Analysis') {
             steps {
-                withSonarQubeEnv('sonarqube') {
-                    sh """mvn sonar:sonar \
-                    -pl ${env.SERVICES_TO_BUILD} -am \
-                    -Dsonar.projectKey=yas-project \
-                    -Dsonar.coverage.jacoco.xmlReportPaths=**/target/site/jacoco/jacoco.xml
-                    """
+                sh '''
+                echo USER=$(whoami)
+                echo JAVA_HOME=$JAVA_HOME
+                mvn -v
+                '''
+
+                // Sử dụng chính xác ID 'sonarqube_connection' đang có trong Jenkins của bạn
+                withCredentials([string(credentialsId: 'sonarqube_connection', variable: 'SONAR_TOKEN')]) {
+                    
+                    // THÊM BỌC NGOÀI NÀY: Kết nối và đồng bộ với Jenkins SonarQube Plugin
+                    withSonarQubeEnv('sonarqube') { 
+                        sh '''
+                        # 1. Biên dịch toàn bộ các module (bỏ qua test) để sinh file target/classes (.class)
+                        # Bước này giúp các module bị SKIP ở stage trước vẫn có binary cho SonarQube quét
+                        mvn clean compile -DskipTests
+
+                        # 2. Thực hiện chạy phân tích tĩnh và đẩy kết quả lên hệ thống
+                        mvn sonar:sonar \
+                        -Dsonar.projectKey=yas-project \
+                        -Dsonar.host.url=http://70.153.136.35:9000 \
+                        -Dsonar.token=$SONAR_TOKEN \
+                        -Dsonar.coverage.jacoco.xmlReportPaths=**/target/site/jacoco/jacoco.xml
+                        '''
+                    }
+                    
                 }
             }
         }
 
+        // ───────────────────────────────────────────────────────
+        // STAGE 7: QUALITY GATE - SONARQUBE
+        // Wait sonarqube return result about test coverage
+        // ───────────────────────────────────────────────────────
+        stage("Quality Gate") {
+            steps {
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }
     }
 
     post {
