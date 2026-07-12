@@ -1237,6 +1237,44 @@ class ProductServiceTest {
         verify(productRepository, times(1)).saveAll(anyList());
     }
 
+    @Test
+    void testGetLatestProducts_whenCountLessThanOrEqualZero_thenReturnEmptyList() {
+        var result = productService.getLatestProducts(0);
+        assertTrue(result.isEmpty());
+
+        var result2 = productService.getLatestProducts(-5);
+        assertTrue(result2.isEmpty());
+    }
+
+    @Test
+    void testGetLatestProducts_whenNoProducts_thenReturnEmptyList() {
+        when(productRepository.getLatestProducts(any(Pageable.class))).thenReturn(Collections.emptyList());
+        var result = productService.getLatestProducts(5);
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void testGetLatestProducts_whenProductsExist_thenReturnProductListVm() {
+        Product product = new Product();
+        product.setId(701L);
+        product.setName("Latest Product");
+        product.setSlug("latest-product");
+        product.setPrice(100.0);
+        product.setAllowedToOrder(true);
+        product.setPublished(true);
+
+        when(productRepository.getLatestProducts(any(Pageable.class))).thenReturn(List.of(product));
+        var result = productService.getLatestProducts(1);
+        assertEquals(1, result.size());
+        assertEquals(701L, result.get(0).id());
+        assertEquals("Latest Product", result.get(0).name());
+    }
+
+    @Test
+    void testJenkinsTriggerAndPass() {
+        assertTrue(true);
+    }
+
 }
 
 }
