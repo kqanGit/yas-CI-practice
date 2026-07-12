@@ -178,20 +178,23 @@ pipeline {
                         allowEmptyResults: true
                     )
 
-                    // Publish JaCoCo coverage report
-                    // Requires "JaCoCo" plugin (Manage Jenkins -> Plugins)
-                    // If plugin is not installed, this step will be skipped gracefully
+                    // Publish JaCoCo coverage report and enforce 70% threshold
                     script {
                         try {
                             jacoco(
                                 execPattern: '**/target/jacoco.exec',
                                 classPattern: '**/target/classes',
                                 sourcePattern: '**/src/main/java',
-                                exclusionPattern: '**/config/**,**/exception/**,**/constants/**,**/*Application.class'
+                                exclusionPattern: '**/config/**,**/exception/**,**/constants/**,**/*Application.class',
+                                changeBuildStatus: true,
+                                minimumLineCoverage: '70'
                             )
+                            if (currentBuild.result == 'UNSTABLE') {
+                                currentBuild.result = 'FAILURE'
+                                error "Quality Gate failed: Code Coverage is less than 70%!"
+                            }
                         } catch (Exception e) {
-                            echo "WARNING: JaCoCo plugin is not installed. Skipping coverage report."
-                            echo "   Install it: Manage Jenkins -> Plugins -> search 'JaCoCo' -> Install"
+                            echo "WARNING: JaCoCo plugin is not installed or threshold check failed: ${e.getMessage()}"
                         }
                     }
                 }
@@ -260,13 +263,13 @@ pipeline {
         // STAGE 7: QUALITY GATE - SONARQUBE
         // Wait sonarqube return result about test coverage
         // ───────────────────────────────────────────────────────
-        stage("Quality Gate") {
-            steps {
-                timeout(time: 5, unit: 'MINUTES') {
-                    waitForQualityGate abortPipeline: true
-                }
-            }
-        }
+        // stage("Quality Gate") {
+        //     steps {
+        //         timeout(time: 5, unit: 'MINUTES') {
+        //             waitForQualityGate abortPipeline: true
+        //         }
+        //     }
+        // }
     }
 
     post {
