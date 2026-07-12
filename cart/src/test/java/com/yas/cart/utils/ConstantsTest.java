@@ -23,4 +23,9 @@ class ConstantsTest {
     void testCartDummyForJenkinsV2() {
         assertEquals(10, 5 + 5);
     }
+
+    @Test
+    void testCartDummyForJenkinsV3() {
+        assertEquals(20, 10 + 10);
+    }
 }
