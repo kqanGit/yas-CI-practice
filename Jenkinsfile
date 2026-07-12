@@ -225,7 +225,6 @@ pipeline {
                         -Dsonar.projectKey=yas-project \
                         -Dsonar.host.url=http://70.153.136.35:9000 \
                         -Dsonar.token=$SONAR_TOKEN \
-                        -Dsonar.java.binaries=**/target/classes \
                         -Dsonar.coverage.jacoco.xmlReportPaths=**/target/site/jacoco/jacoco.xml,**/target/site/jacoco-ut/jacoco.xml
                         '''
                     }
