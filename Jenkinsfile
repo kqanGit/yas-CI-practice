@@ -261,30 +261,6 @@ pipeline {
         //         }
         //     }
         // }
-
-        // ───────────────────────────────────────────────────────
-        // STAGE 8: SNYK SCAN
-        // Scan dependencies to secure system if dependencies is not safe
-        // ───────────────────────────────────────────────────────
-        stage('Snyk Scan') {
-            steps {
-                withCredentials([string(credentialsId: 'snyk_connection', variable: 'SNYK_TOKEN')]) {
-                    sh '''
-                    snyk auth $SNYK_TOKEN
-
-                    echo ">>> Running Snyk vulnerability scan..."
-                    
-                    # 1. Quét cục bộ và in log ra console của Jenkins
-                    snyk test || true
-
-                    echo ">>> Pushing Snyk snapshot to Web Dashboard..."
-                    
-                    # 2. THÊM DÒNG NÀY: Đẩy toàn bộ kết quả lên Dashboard Snyk của tổ chức
-                    snyk monitor || true
-                    '''
-                }
-            }
-        }
     }
 
     post {
