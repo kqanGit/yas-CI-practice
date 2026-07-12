@@ -238,7 +238,7 @@ pipeline {
                 withCredentials([string(credentialsId: 'sonarqube_connection', variable: 'SONAR_TOKEN')]) {
                     
                     // THÊM BỌC NGOÀI NÀY: Kết nối và đồng bộ với Jenkins SonarQube Plugin
-                    withSonarQubeEnv('sonarqube') { [cite: 96]
+                    withSonarQubeEnv('sonarqube') {
                         sh '''
                         # KHÔNG DÙNG clean để tránh xóa mất file jacoco.xml đã tạo ở stage Test
                         mvn compile -DskipTests 
@@ -249,7 +249,7 @@ pipeline {
                         -Dsonar.host.url=http://70.153.136.35:9000 \
                         -Dsonar.token=$SONAR_TOKEN \
                         -Dsonar.coverage.jacoco.xmlReportPaths=**/target/site/jacoco/jacoco.xml
-                        ''' [cite: 98, 99]
+                        '''
                     }
                     
                 }
